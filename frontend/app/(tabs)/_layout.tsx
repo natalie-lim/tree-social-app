@@ -30,6 +30,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="firebase-test"
+        options={{
+          title: 'Firebase Test',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="flame.fill" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }

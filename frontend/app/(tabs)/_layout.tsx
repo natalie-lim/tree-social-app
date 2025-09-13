@@ -1,9 +1,8 @@
 import { Tabs } from "expo-router";
 import React from "react";
-
+import { Text, View } from "react-native";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 export default function TabLayout() {
@@ -12,17 +11,38 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarStyle: {
+          // Tab bar needs inline styles
+          backgroundColor: "#749C75",
+          height: 120,
+          paddingBottom: 16,
+          paddingTop: 12,
+        },
+        tabBarActiveTintColor: "#FFFAF0",
+        tabBarInactiveTintColor: "#FFFAF0",
+        tabBarLabel: ({ color, children }) => (
+          <Text
+            className="text-[12px] font-semibold"
+            style={{ color }}
+          >
+            {children}
+          </Text>
+        ),
       }}
     >
       <Tabs.Screen
         name="feed"
         options={{
           title: "Feed",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="newspaper.fill" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol
+              name="newspaper.fill"
+              color={color}
+              size={focused ? 50 : 28}
+              style={focused ? { marginBottom: 16 } : {}}
+            />
           ),
         }}
       />
@@ -30,8 +50,13 @@ export default function TabLayout() {
         name="your-lists"
         options={{
           title: "Your Lists",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="list.bullet" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol
+              name="list.bullet"
+              color={color}
+              size={focused ? 50 : 28}
+              style={focused ? { marginBottom: 16 } : {}}
+            />
           ),
         }}
       />
@@ -39,17 +64,27 @@ export default function TabLayout() {
         name="search"
         options={{
           title: "Search",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="magnifyingglass" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol
+              name="magnifyingglass"
+              color={color}
+              size={focused ? 50 : 28}
+              style={focused ? { marginBottom: 16 } : {}}
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="leaderboard"
         options={{
-          title: "Leaderboard",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="trophy.fill" color={color} />
+          title: "Leader",
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol
+              name="trophy.fill"
+              color={color}
+              size={focused ? 50 : 28}
+              style={focused ? { marginBottom: 16 } : {}}
+            />
           ),
         }}
       />
@@ -57,16 +92,14 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="person.fill" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol
+              name="person.fill"
+              color={color}
+              size={focused ? 50 : 28}
+              style={focused ? { marginBottom: 16 } : {}}
+            />
           ),
-        }}
-      />
-      <Tabs.Screen
-        name="firebase-test"
-        options={{
-          title: 'Firebase Test',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="flame.fill" color={color} />,
         }}
       />
     </Tabs>

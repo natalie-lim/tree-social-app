@@ -1,17 +1,17 @@
+import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { router } from 'expo-router';
 
 export default function SignupScreen() {
   const [email, setEmail] = useState('');
@@ -43,7 +43,11 @@ export default function SignupScreen() {
       Alert.alert('Success', 'Account created successfully!');
       router.replace('/(tabs)/feed');
     } catch (error) {
-      Alert.alert('Signup Error', error.message);
+      if (error instanceof Error) {
+        Alert.alert('Signup Error', error.message);
+      } else {
+        Alert.alert('Signup Error', String(error));
+      }
     } finally {
       setLoading(false);
     }
@@ -70,6 +74,7 @@ export default function SignupScreen() {
               value={displayName}
               onChangeText={setDisplayName}
               autoCapitalize="words"
+              placeholderTextColor="#474350"
             />
           </View>
 
@@ -82,6 +87,7 @@ export default function SignupScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              placeholderTextColor="#474350"
             />
           </View>
 
@@ -93,6 +99,7 @@ export default function SignupScreen() {
               onChangeText={setPassword}
               secureTextEntry
               autoCapitalize="none"
+              placeholderTextColor="#474350"
             />
           </View>
 
@@ -104,6 +111,7 @@ export default function SignupScreen() {
               onChangeText={setConfirmPassword}
               secureTextEntry
               autoCapitalize="none"
+              placeholderTextColor="#474350"
             />
           </View>
 
@@ -132,7 +140,7 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FFFAF0',
   },
   scrollContainer: {
     flexGrow: 1,

@@ -1,17 +1,17 @@
+import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { router } from 'expo-router';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -30,7 +30,11 @@ export default function LoginScreen() {
       await signIn(email, password);
       router.replace('/(tabs)/feed');
     } catch (error) {
-      Alert.alert('Login Error', error.message);
+      if (error instanceof Error) {
+        Alert.alert('Login Error', error.message);
+      } else {
+        Alert.alert('Login Error', String(error));
+      }
     } finally {
       setLoading(false);
     }
@@ -54,6 +58,7 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               placeholder="Email"
+              placeholderTextColor="#474350"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -66,6 +71,7 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               placeholder="Password"
+              placeholderTextColor="#474350"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -98,7 +104,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FFFAF0',
   },
   scrollContainer: {
     flexGrow: 1,

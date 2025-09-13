@@ -54,6 +54,7 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               placeholder="Email"
+              placeholderTextColor="#474350"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -66,6 +67,7 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               placeholder="Password"
+              placeholderTextColor="#474350"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -98,7 +100,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FFFAF0',
   },
   scrollContainer: {
     flexGrow: 1,

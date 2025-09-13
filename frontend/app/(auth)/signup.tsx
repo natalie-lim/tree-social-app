@@ -70,6 +70,7 @@ export default function SignupScreen() {
               value={displayName}
               onChangeText={setDisplayName}
               autoCapitalize="words"
+              placeholderTextColor="#474350"
             />
           </View>
 
@@ -82,6 +83,7 @@ export default function SignupScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              placeholderTextColor="#474350"
             />
           </View>
 
@@ -93,6 +95,7 @@ export default function SignupScreen() {
               onChangeText={setPassword}
               secureTextEntry
               autoCapitalize="none"
+              placeholderTextColor="#474350"
             />
           </View>
 
@@ -104,6 +107,7 @@ export default function SignupScreen() {
               onChangeText={setConfirmPassword}
               secureTextEntry
               autoCapitalize="none"
+              placeholderTextColor="#474350"
             />
           </View>
 
@@ -132,7 +136,7 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FFFAF0',
   },
   scrollContainer: {
     flexGrow: 1,

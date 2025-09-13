@@ -8,9 +8,9 @@ export default function Home() {
       <Ionicons name="leaf" size={96} style={styles.leaf} />
 
       <Text style={styles.title}>LEAFLET</Text>
-{/* 
-      <PillButton label="sign up" onPress={() => router.push("/signup")} /> */}
-      {/* <PillButton label="login"   onPress={() => router.push("/login")} /> */}
+
+      <PillButton label="sign up" onPress={() => router.push("/signup")} />
+      <PillButton label="login"   onPress={() => router.push("/login")} />
     </View>
   );
 }
@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   leaf: {
-    color: "#6C966E",
+    color: "#749C75",
     marginBottom: 16,
   },
   title: {
@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   button: {
-    backgroundColor: "#6C966E",
+    backgroundColor: "#749C75",
     borderRadius: 999,
     paddingVertical: 14,
     paddingHorizontal: 28,

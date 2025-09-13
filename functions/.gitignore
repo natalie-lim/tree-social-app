@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+lib/
+
+# Environment variables
+.env
+.env.local
+
+# Service account keys
+serviceAccountKey.json
+*-service-account.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Firebase
+.firebase/
+firebase-debug.log
+ui-debug.log

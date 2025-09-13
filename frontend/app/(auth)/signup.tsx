@@ -43,7 +43,11 @@ export default function SignupScreen() {
       Alert.alert('Success', 'Account created successfully!');
       router.replace('/(tabs)/feed');
     } catch (error) {
-      Alert.alert('Signup Error', error.message);
+      if (error instanceof Error) {
+        Alert.alert('Signup Error', error.message);
+      } else {
+        Alert.alert('Signup Error', String(error));
+      }
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,14 @@
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
+## Fix
+
+- Navigate to the directory with cd
+- npm run ios 
+- open -a Simulator
+- npm run start
+
+
 ## Get started
 
 1. Install dependencies

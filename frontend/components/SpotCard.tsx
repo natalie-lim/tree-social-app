@@ -137,7 +137,6 @@ export function SpotCard({
         {/* User Section */}
         {resolvedName && (
           <View style={styles.userSection}>
-            <Text style={styles.userIcon}>👤</Text>
             <ThemedText style={styles.userText}>
               {resolvedName}'s ranking
             </ThemedText>
@@ -148,7 +147,7 @@ export function SpotCard({
         <View style={styles.notesSection}>
           <ThemedText style={styles.notesLabel}>Your Notes:</ThemedText>
           <ThemedText style={styles.notesText}>
-            {userNotes || spot.description || "No notes added yet"}
+            {userNotes || "No notes added yet"}
           </ThemedText>
         </View>
 

@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,6 +22,7 @@ interface SpotWithRanking extends Spot {
     userName: string;
     userDisplayName: string;
     userNotes?: string;
+    rating?: number;
   };
 }
 
@@ -39,15 +41,20 @@ export default function Feed() {
   const { user } = useAuth();
   const [spots, setSpots] = useState<SpotWithRanking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSpots();
   }, []);
 
-  const fetchSpots = async () => {
+  const fetchSpots = async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
 
       // Step 1: Get all users
@@ -77,48 +84,22 @@ export default function Feed() {
         }
       }
 
-      // Step 3: Fetch full ranking documents from rankings collection
-      const allRankings = [];
-      for (const rankingId of allRankingIds) {
-        try {
-          const rankingDoc = await firestoreService.read("rankings", rankingId);
-          if (rankingDoc) {
-            allRankings.push({
-              ...rankingDoc,
-              id: rankingId,
-            });
-          }
-        } catch (err) {}
-      }
+      // Step 3: Fetch all rankings ordered by createdAt (most recent first)
+      const allRankings = await firestoreService.query('rankings', [], 'createdAt', 100);
 
-      // Step 4: Extract unique spotIds from rankings
-      const spotIds = [
-        ...new Set(
-          allRankings
-            .map((ranking: any) => {
-              // Extract spotId from ranking document
-              const spotId = ranking.spotId;
-              return spotId;
-            })
-            .filter(Boolean)
-        ),
-      ];
-
-      // Step 5: Get all spots and match by name
+      // Step 4: Get all spots for matching
       const allSpots = await firestoreService.getAll("spots");
 
-      // Step 6: Create spots with user information from users collection
+      // Step 5: Create spots with user information from rankings (already sorted by createdAt desc)
       const spotsWithUsers = [];
       for (const ranking of allRankings) {
         const rankingData = ranking as any; // Type assertion to access ranking properties
         const spotId = rankingData.spotId;
         const userId = rankingData.userId; // Use userId field from ranking document
 
+
         if (spotId && userId) {
-          // Skip if this ranking belongs to the current user
-          if (user && userId === user.uid) {
-            continue;
-          }
+          // Include all users' activities, including current user
 
           const matchingSpot = allSpots.find((spot) => spot.id === spotId);
           if (matchingSpot) {
@@ -134,7 +115,7 @@ export default function Feed() {
               userDataTyped?.displayName || userDataTyped?.email || "User";
 
             spotsWithUsers.push({
-              ...matchingSpot,
+              ...(matchingSpot as Spot),
               rankingUser: {
                 userId: userId,
                 userName: finalUserName,
@@ -143,18 +124,26 @@ export default function Feed() {
                   rankingData.note ||
                   rankingData.notes ||
                   rankingData.description,
+                rating: rankingData.rating || 0,
+                createdAt: rankingData.createdAt || rankingData.timestamp,
               },
             });
           }
         }
       }
 
+      // Rankings are already sorted by createdAt desc from the query
+      // No additional sorting needed since we're processing them in order
       setSpots(spotsWithUsers as SpotWithRanking[]);
     } catch (err) {
       console.error("Error fetching spots:", err);
       setError("Failed to load spots");
     } finally {
-      setLoading(false);
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
@@ -167,10 +156,22 @@ export default function Feed() {
     });
   };
 
+  const onRefresh = () => {
+    fetchSpots(true);
+  };
+
   return (
     <ScrollView
       style={styles.screen}
       contentContainerStyle={{ paddingTop: 60, paddingBottom: 24 }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[COLORS.brand]} // Android
+          tintColor={COLORS.brand} // iOS
+        />
+      }
     >
       {/* Top bar */}
       <View style={styles.topRow}>
@@ -213,6 +214,14 @@ export default function Feed() {
       {/* Feed content */}
       <Text style={styles.sectionTitle}>Discover Spots</Text>
 
+      {/* Refreshing indicator */}
+      {refreshing && (
+        <View style={styles.refreshingContainer}>
+          <ActivityIndicator size="small" color={COLORS.brand} style={styles.refreshingSpinner} />
+          <Text style={styles.refreshingText}>Refreshing feed...</Text>
+        </View>
+      )}
+
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.brand} />
@@ -221,7 +230,7 @@ export default function Feed() {
       ) : error ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchSpots}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => fetchSpots()}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -233,9 +242,9 @@ export default function Feed() {
           </Text>
         </View>
       ) : (
-        spots.map((spot: SpotWithRanking) => (
+        spots.map((spot: any, index: number) => (
           <SpotCard
-            key={spot.id}
+            key={`${spot.id}-${spot.rankingUser?.userId}-${index}`}
             spot={spot}
             onPress={handleSpotPress}
             style={styles.spotCard}
@@ -243,6 +252,7 @@ export default function Feed() {
             userName={spot.rankingUser?.userName}
             userDisplayName={spot.rankingUser?.userDisplayName}
             userNotes={spot.rankingUser?.userNotes}
+            userRating={spot.rankingUser?.rating}
           />
         ))
       )}
@@ -388,5 +398,19 @@ const styles = StyleSheet.create({
     color: COLORS.chipText,
     fontSize: 16,
     fontWeight: "600",
+  },
+  refreshingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  refreshingSpinner: {
+    marginRight: 8,
+  },
+  refreshingText: {
+    fontSize: 14,
+    color: COLORS.brand,
+    fontWeight: "500",
   },
 });

@@ -308,5 +308,94 @@ export const rankingsService = {
       { field: 'spotId', operator: '==', value: spotId }
     ]);
     return rankings.length > 0 ? rankings[0] : null;
+  },
+
+  // Bookmark functions
+  async addBookmark(userId, spotId) {
+    const userDoc = await firestoreService.query('users', [
+      { field: 'userId', operator: '==', value: userId }
+    ]);
+    
+    if (userDoc.length === 0) {
+      throw new Error('User not found');
+    }
+
+    const userData = userDoc[0];
+    const currentBookmarks = userData.bookmarks || [];
+    
+    if (currentBookmarks.includes(spotId)) {
+      throw new Error('Spot already bookmarked');
+    }
+
+    const updatedBookmarks = [...currentBookmarks, spotId];
+    
+    return await firestoreService.update('users', userData.id, {
+      bookmarks: updatedBookmarks,
+      updatedAt: new Date()
+    });
+  },
+
+  async removeBookmark(userId, spotId) {
+    const userDoc = await firestoreService.query('users', [
+      { field: 'userId', operator: '==', value: userId }
+    ]);
+    
+    if (userDoc.length === 0) {
+      throw new Error('User not found');
+    }
+
+    const userData = userDoc[0];
+    const currentBookmarks = userData.bookmarks || [];
+    
+    if (!currentBookmarks.includes(spotId)) {
+      throw new Error('Spot not bookmarked');
+    }
+
+    const updatedBookmarks = currentBookmarks.filter(id => id !== spotId);
+    
+    return await firestoreService.update('users', userData.id, {
+      bookmarks: updatedBookmarks,
+      updatedAt: new Date()
+    });
+  },
+
+  async toggleBookmark(userId, spotId) {
+    const userDoc = await firestoreService.query('users', [
+      { field: 'userId', operator: '==', value: userId }
+    ]);
+    
+    if (userDoc.length === 0) {
+      throw new Error('User not found');
+    }
+
+    const userData = userDoc[0];
+    const currentBookmarks = userData.bookmarks || [];
+    
+    let updatedBookmarks;
+    if (currentBookmarks.includes(spotId)) {
+      // Remove bookmark
+      updatedBookmarks = currentBookmarks.filter(id => id !== spotId);
+    } else {
+      // Add bookmark
+      updatedBookmarks = [...currentBookmarks, spotId];
+    }
+    
+    return await firestoreService.update('users', userData.id, {
+      bookmarks: updatedBookmarks,
+      updatedAt: new Date()
+    });
+  },
+
+  async getUserBookmarks(userId) {
+    const userDoc = await firestoreService.query('users', [
+      { field: 'userId', operator: '==', value: userId }
+    ]);
+    
+    if (userDoc.length === 0) {
+      return [];
+    }
+
+    const userData = userDoc[0];
+    return userData.bookmarks || [];
   }
 };

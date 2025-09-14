@@ -24,6 +24,7 @@ export const userService = {
       totalReviews: 0,
       totalRankings: 0,
       averageRating: 0,
+      averageRanking: 0,
       badges: [],
       joinedAt: Timestamp.now()
     };
@@ -103,6 +104,11 @@ export const userService = {
         ? userReviews.reduce((sum, review) => sum + (review.rating || 0), 0) / userReviews.length
         : 0;
       
+      // Calculate average ranking from rankings
+      const averageRanking = userRankings.length > 0 
+        ? userRankings.reduce((sum, ranking) => sum + (ranking.rating || 0), 0) / userRankings.length
+        : 0;
+      
       // Update user profile with new stats
       const userProfile = await this.getUserProfile(userId);
       if (userProfile) {
@@ -111,6 +117,7 @@ export const userService = {
           totalReviews: userReviews.length,
           totalRankings: userRankings.length,
           averageRating: Math.round(averageRating * 10) / 10,
+          averageRanking: Math.round(averageRanking * 10) / 10,
           updatedAt: Timestamp.now()
         });
       }

@@ -36,8 +36,10 @@ interface UserProfile {
   totalSpots: number;
   totalReviews: number;
   averageRating: number;
+  averageRanking: number;
   rankings?: UserRanking[];
   totalRankings?: number;
+  bookmarks?: string[]; // Array of spot IDs
 }
 
 const PALETTE = {
@@ -471,16 +473,14 @@ export default function Profile() {
               }}
             />
             <View style={styles.divider} />
-            <ListRow label="Reviews" value={userProfile?.totalReviews || 0} />
-            <View style={styles.divider} />
-            <ListRow
-              label="Average Rating"
-              value={
-                userProfile?.averageRating
-                  ? userProfile.averageRating.toFixed(1)
-                  : "0.0"
-              }
+            <ListRow 
+              label="Bookmarks" 
+              value={userProfile?.bookmarks?.length || 0}
+              onPress={() => {
+                router.push("/bookmarks");
+              }}
             />
+            <View style={styles.divider} />
           </View>
 
           {/* User's Rankings */}

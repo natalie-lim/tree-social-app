@@ -1,10 +1,12 @@
-import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { getRatingColor } from "@/utils/ratingColors";
-import React, { useEffect, useState } from "react";
-import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
-import { db } from "../config/firebase";
-import { ThemedText } from "./themed-text";
 import { router } from "expo-router";
+import { collection, getDocs, limit, query, where } from "firebase/firestore";
+import React, { useEffect, useState } from "react";
+import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import { db } from "../config/firebase";
+import { useAuth } from "../contexts/AuthContext";
+import { rankingsService } from "../services/firestore";
+import { ThemedText } from "./themed-text";
 
 // Types based on the document structure
 export interface SpotPhoto {
@@ -55,6 +57,7 @@ interface SpotCardProps {
   userName?: string;
   userDisplayName?: string;
   userNotes?: string;
+  userRating?: number;
 }
 
 const { width } = Dimensions.get("window");
@@ -67,10 +70,14 @@ export function SpotCard({
   userName,
   userDisplayName,
   userNotes,
+  userRating,
 }: SpotCardProps) {
+  const { user } = useAuth();
   const [resolvedName, setResolvedName] = useState<string | undefined>(
     userDisplayName
   );
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -105,6 +112,22 @@ export function SpotCard({
     };
   }, [rankingUserId, userDisplayName, userName]);
 
+  // Check if spot is bookmarked
+  useEffect(() => {
+    const checkBookmarkStatus = async () => {
+      if (!user || !spot.id) return;
+      
+      try {
+        const bookmarks = await rankingsService.getUserBookmarks(user.uid);
+        setIsBookmarked(bookmarks.includes(spot.id));
+      } catch (error) {
+        console.error('Error checking bookmark status:', error);
+      }
+    };
+
+    checkBookmarkStatus();
+  }, [user, spot.id]);
+
   // Title case helper
   const toTitleCase = (name: string) =>
     name.replace(/\w\S*/g, (txt) => txt[0].toUpperCase() + txt.slice(1).toLowerCase());
@@ -116,22 +139,32 @@ export function SpotCard({
     router.push(`/user/${encodeURIComponent(rankingUserId)}`);
   };
 
+  // Bookmark functionality
+  const handleBookmarkToggle = async () => {
+    if (!user || !spot.id) return;
+    
+    // Check if user is trying to bookmark their own spot
+    if (rankingUserId === user.uid) {
+      Alert.alert("Cannot bookmark", "You cannot bookmark your own spots");
+      return;
+    }
 
-
-
-  const goToMap = () => {
-    const { latitude, longitude } = spot.location.coordinates || {};
-    if (latitude == null || longitude == null) return;
-    router.push({
-      pathname: "/map",
-      params: {
-        lat: String(latitude),
-        lng: String(longitude),
-        name: spot.name,
-        spotId: spot.id,
-      },
-    });
+    setIsBookmarkLoading(true);
+    
+    try {
+      await rankingsService.toggleBookmark(user.uid, spot.id);
+      setIsBookmarked(!isBookmarked);
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      Alert.alert("Error", "Failed to update bookmark");
+    } finally {
+      setIsBookmarkLoading(false);
+    }
   };
+
+
+
+
 
   return (
     <Pressable style={[styles.card, style]} onPress={() => onPress?.(spot)}>
@@ -152,16 +185,25 @@ export function SpotCard({
             </View>
 
 
-            {/* Address → Map */}
-            <Pressable onPress={goToMap} accessibilityRole="link" hitSlop={6}>
-              <ThemedText style={styles.spotLocation} numberOfLines={1}>
-                {spot.location.address}
-              </ThemedText>
-            </Pressable>
+            {/* Address */}
+            <ThemedText style={styles.spotLocation} numberOfLines={1}>
+              {spot.location.address}
+            </ThemedText>
           </View>
 
           {/* Right side - Rating circle */}
-          {spot.averageRating > 0 && (
+          {(userRating && userRating > 0) ? (
+            <View
+              style={[
+                styles.ratingCircle,
+                { backgroundColor: getRatingColor(userRating) },
+              ]}
+            >
+              <Text style={styles.ratingText}>
+                {userRating.toFixed(1)}
+              </Text>
+            </View>
+          ) : spot.averageRating > 0 ? (
             <View
               style={[
                 styles.ratingCircle,
@@ -172,7 +214,7 @@ export function SpotCard({
                 {spot.averageRating.toFixed(1)}
               </Text>
             </View>
-          )}
+          ) : null}
         </View>
 
         {/* User Notes Section */}
@@ -183,7 +225,7 @@ export function SpotCard({
           </ThemedText>
         </View>
 
-        {/* Comments and Likes Section */}
+        {/* Comments, Likes, and Bookmarks Section */}
         <View className="social" style={styles.socialSection}>
           <View style={styles.socialItem}>
             <Text style={styles.socialIcon}>💬</Text>
@@ -197,6 +239,18 @@ export function SpotCard({
               {spot.totalRatings || 0} likes
             </ThemedText>
           </View>
+          <Pressable 
+            style={styles.socialItem} 
+            onPress={handleBookmarkToggle}
+            disabled={isBookmarkLoading || rankingUserId === user?.uid}
+          >
+            <Text style={styles.socialIcon}>
+              {isBookmarked ? '🔖' : '📖'}
+            </Text>
+            <ThemedText style={styles.socialText}>
+              {isBookmarked ? 'bookmarked' : 'bookmark'}
+            </ThemedText>
+          </Pressable>
         </View>
       </View>
     </Pressable>
@@ -248,10 +302,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // Address → Map
+  // Address
   spotLocation: {
     fontSize: 14,
-    color: "#2F4A43", // darker so it reads as tappable
+    color: "#6B7280", // regular text color
   },
 
   ratingCircle: {

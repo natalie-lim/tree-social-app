@@ -24,6 +24,37 @@ interface RankingPopupProps {
   comparisonSpots?: Spot[];
 }
 
+// Map quick category to an initial band (top / middle / bottom third)
+const seedBandFromBucket = (
+  bucket: 'liked' | 'fine' | 'disliked',
+  n: number
+) => {
+  if (n <= 0) return { l: 0, r: -1 };
+  const third = Math.max(1, Math.ceil(n / 3));
+  if (bucket === 'liked')   return { l: 0,        r: Math.min(n - 1, third - 1) };
+  if (bucket === 'fine')    return { l: third,    r: Math.min(n - 1, 2 * third - 1) };
+  // disliked
+  return { l: Math.min(2 * third, n - 1), r: n - 1 };
+};
+
+// Turn insertion index into a 1–10 score (top => ~10, bottom => ~1)
+const indexToScore = (insertAt: number, n: number, maxScore?: number, minScore?: number) => {
+  if (n <= 0) return 5.5;
+  const clamped = Math.max(0, Math.min(insertAt, n)); // insertAt can be n (append)
+  const normalized = 1 + 9 * (1 - clamped / n);
+  let score = Math.round(normalized * 10) / 10;
+  
+  // Apply constraints
+  if (maxScore !== undefined) {
+    score = Math.min(score, maxScore);
+  }
+  if (minScore !== undefined) {
+    score = Math.max(score, minScore);
+  }
+  
+  return score;
+};
+
 export default function RankingPopup({
   visible,
   onClose,
@@ -35,115 +66,120 @@ export default function RankingPopup({
   const [baseRating, setBaseRating] = useState<number | null>(null);
   const [note, setNote] = useState('');
 
-  // Binary search state for ranking insertion
+  // 🔒 Frozen snapshot of the list for this session (prevents mid-flow mutations)
+  const [sessionComparisons, setSessionComparisons] = useState<Spot[]>([]);
+
+  // Binary search state
   const [left, setLeft] = useState(0);
-  const [right, setRight] = useState(comparisonSpots.length - 1);
-  const [currentIndex, setCurrentIndex] = useState(
-    Math.floor(comparisonSpots.length / 2)
-  );
+  const [right, setRight] = useState(-1);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [finalIndex, setFinalIndex] = useState<number | null>(null);
 
-  // Complex scoring system state
+  // Score + UX
   const [refinedRating, setRefinedRating] = useState<number | null>(null);
   const [comparisonCount, setComparisonCount] = useState(0);
+  const [selectedBucket, setSelectedBucket] = useState<'liked' | 'fine' | 'disliked' | null>(null);
+  const [maxAllowedScore, setMaxAllowedScore] = useState<number | null>(null);
+  const [minAllowedScore, setMinAllowedScore] = useState<number | null>(null);
 
+  // Guard against rapid double taps during a step
+  const [lockStep, setLockStep] = useState(false);
 
+  // Log rating changes only when they actually change
   useEffect(() => {
-    if (visible) {
-      setBaseRating(null);
-      setRefinedRating(null);
-      setNote('');
-      setLeft(0);
-      setRight(comparisonSpots.length - 1);
-      setCurrentIndex(Math.floor(comparisonSpots.length / 2));
-      setFinalIndex(null);
-      setComparisonCount(0);
+    if (refinedRating !== null || baseRating !== null) {
+      const displayRating = refinedRating?.toFixed(1) || baseRating?.toFixed(1);
+      console.log('Rating updated:', { refinedRating, baseRating, displayRating });
     }
-  }, [visible, comparisonSpots.length]);
+  }, [refinedRating, baseRating]);
 
-  // Complex scoring algorithm
-  const calculateComplexScore = (baseRating: number, comparisonData: any) => {
-    let score = baseRating;
-    
-    // Factor 1: Base rating weight (40%)
-    const baseWeight = 0.4;
-    
-    // Factor 2: Comparison adjustments (30%)
-    const comparisonWeight = 0.3;
-    const comparisonAdjustment = comparisonData.adjustment || 0;
-    
-    // Factor 3: User preference patterns (20%)
-    const preferenceWeight = 0.2;
-    const preferenceBonus = comparisonData.preferenceBonus || 0;
-    
-    // Factor 4: Spot characteristics (10%)
-    const characteristicsWeight = 0.1;
-    const characteristicsBonus = comparisonData.characteristicsBonus || 0;
-    
-    // Calculate weighted score
-    score = (baseRating * baseWeight) + 
-            (comparisonAdjustment * comparisonWeight) + 
-            (preferenceBonus * preferenceWeight) + 
-            (characteristicsBonus * characteristicsWeight);
-    
-    // Apply bounds and rounding
-    return Math.max(1, Math.min(10, Math.round(score * 10) / 10));
-  };
+  // Build frozen, duplicate-free snapshot when modal opens (or spot changes)
+  useEffect(() => {
+    if (!visible) return;
+
+    const filtered = (comparisonSpots || []).filter(s => s && s.id !== spot?.id);
+    // If you have a user-specific score, you can sort here (desc).
+    // filtered.sort((a,b) => (b.userScore ?? b.averageRating ?? 0) - (a.userScore ?? a.averageRating ?? 0));
+
+    setSessionComparisons(filtered);
+
+    // reset state
+    setBaseRating(null);
+    setSelectedBucket(null);
+    setRefinedRating(null);
+    setNote('');
+    setFinalIndex(null);
+    setComparisonCount(0);
+    setLockStep(false);
+    setMaxAllowedScore(null);
+    setMinAllowedScore(null);
+
+    const n = filtered.length;
+    setLeft(0);
+    setRight(n - 1);
+    setCurrentIndex(Math.floor((0 + Math.max(-1, n - 1)) / 2));
+  }, [visible, spot?.id]); // Removed comparisonSpots from dependencies
 
   const handleRatingPress = (bucket: 'liked' | 'fine' | 'disliked') => {
-    let rating = 5; // Default middle rating
-    
-    switch (bucket) {
-      case 'liked':
-        rating = 8.5; // High rating for liked
-        break;
-      case 'fine':
-        rating = 5.5; // Middle rating for fine
-        break;
-      case 'disliked':
-        rating = 2.5; // Low rating for disliked
-        break;
-    }
-    
+    setSelectedBucket(bucket);
+  
+    let rating = 5.5;
+    if (bucket === 'liked') rating = 8.5;
+    if (bucket === 'disliked') rating = 2.5;
+  
     setBaseRating(rating);
     setRefinedRating(rating);
-  };
+  
+    const n = sessionComparisons.length;
+    if (n === 0) {
+      setFinalIndex(0);
+      setRefinedRating(rating);
+      return;
+    }
+  
+    const { l, r } = seedBandFromBucket(bucket, n);
+    setLeft(l);
+    setRight(r);
+    setCurrentIndex(Math.floor((l + r) / 2));
+  
+    if (l > r) {
+      setFinalIndex(l);
+      setRefinedRating(indexToScore(l, n));
+    }
+  };  
 
   const handleComparison = (preferred: 'new' | 'existing') => {
+    if (lockStep) return;
     if (finalIndex !== null || baseRating === null) return;
   
-    const currentComparison = comparisonSpots[currentIndex];
-    if (!currentComparison) return;
+    const n = sessionComparisons.length;
+    if (n === 0) return;
   
+    setLockStep(true);
     setComparisonCount(prev => prev + 1);
   
-    // Update binary search bounds
     let nextLeft = left;
     let nextRight = right;
   
     if (preferred === 'new') {
-      nextRight = currentIndex - 1;
+      nextRight = currentIndex - 1;   // new is better → search higher
     } else {
-      nextLeft = currentIndex + 1;
+      nextLeft = currentIndex + 1;    // existing is better → search lower
     }
   
     if (nextLeft > nextRight) {
-      // Final insertion index found
       const insertAt = preferred === 'new' ? currentIndex : currentIndex + 1;
       setFinalIndex(insertAt);
-  
-      // 🔑 Convert index into normalized score (1–10)
-      const normalized =
-        1 + 9 * (1 - insertAt / Math.max(1, comparisonSpots.length));
-      setRefinedRating(Math.round(normalized * 10) / 10);
+      setRefinedRating(indexToScore(insertAt, n));
+      setLockStep(false);
     } else {
-      // Keep narrowing search
-      setCurrentIndex(Math.floor((nextLeft + nextRight) / 2));
+      const mid = Math.floor((nextLeft + nextRight) / 2);
       setLeft(nextLeft);
       setRight(nextRight);
+      setCurrentIndex(mid);
+      setTimeout(() => setLockStep(false), 120);
     }
-  };
-  
+  };  
 
   const handleSubmit = async () => {
     if (baseRating === null) {
@@ -153,14 +189,14 @@ export default function RankingPopup({
     if (!spot) return;
   
     try {
-      // If binary search finished, use refined normalized rating
-      const finalRating = refinedRating || baseRating;
+      const n = sessionComparisons.length;
+      let insertAt = finalIndex ?? left; // fallback to left if unfinished
+      const finalRating = insertAt !== null
+        ? indexToScore(insertAt, n)
+        : baseRating;
   
-      const rankedList = [...comparisonSpots];
-      const insertAt = finalIndex ?? rankedList.length;
-  
-      // Insert new spot into correct position
-      rankedList.splice(insertAt, 0, spot);
+      const rankedList = [...sessionComparisons];
+      rankedList.splice(Math.max(0, Math.min(insertAt ?? n, n)), 0, spot);
   
       await onSubmit(finalRating, note, rankedList);
       onClose();
@@ -176,10 +212,16 @@ export default function RankingPopup({
     setNote('');
     setFinalIndex(null);
     setComparisonCount(0);
+    setLockStep(false);
+    setMaxAllowedScore(null);
+    setMinAllowedScore(null);
     onClose();
   };
 
-  if (!spot) return null;
+  if (!spot) {
+    console.log('No spot provided, returning null');
+    return null;
+  }
 
   return (
     <Modal
@@ -190,7 +232,7 @@ export default function RankingPopup({
     >
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={handleClose} />
-
+  
         <View style={styles.popupContainer}>
           {/* Spot Header */}
           <View style={styles.spotHeader}>
@@ -199,7 +241,7 @@ export default function RankingPopup({
               <ThemedText style={styles.closeButtonText}>✕</ThemedText>
             </Pressable>
           </View>
-
+  
           <View style={styles.contentContainer}>
             {/* Quick Rating */}
             <View style={styles.ratingSection}>
@@ -216,9 +258,10 @@ export default function RankingPopup({
                       styles.ratingButton,
                       baseRating !== null &&
                         ((bucket === 'liked' && baseRating >= 7) ||
-                        (bucket === 'fine' && baseRating >= 4 && baseRating < 7) ||
-                        (bucket === 'disliked' && baseRating < 4))
-                        && { backgroundColor: color },
+                          (bucket === 'fine' && baseRating >= 4 && baseRating < 7) ||
+                          (bucket === 'disliked' && baseRating < 4)) && {
+                          backgroundColor: color,
+                        },
                     ]}
                     onPress={() => handleRatingPress(bucket as any)}
                   >
@@ -227,9 +270,10 @@ export default function RankingPopup({
                         styles.ratingButtonText,
                         baseRating !== null &&
                           ((bucket === 'liked' && baseRating >= 7) ||
-                          (bucket === 'fine' && baseRating >= 4 && baseRating < 7) ||
-                          (bucket === 'disliked' && baseRating < 4))
-                          && { color: '#FFFFFF' },
+                            (bucket === 'fine' && baseRating >= 4 && baseRating < 7) ||
+                            (bucket === 'disliked' && baseRating < 4)) && {
+                            color: '#FFFFFF',
+                          },
                       ]}
                     >
                       {label}
@@ -237,76 +281,118 @@ export default function RankingPopup({
                   </TouchableOpacity>
                 ))}
               </View>
-              
-              {/* Show refined rating */}
-              {refinedRating !== null && (
-                <View style={[styles.ratingDisplay, { backgroundColor: getRatingBackgroundColor(refinedRating) }]}>
-                  <ThemedText style={styles.ratingLabel}>Refined Rating:</ThemedText>
-                  <View style={styles.ratingValueContainer}>
-                    <ThemedText style={[styles.ratingValue, { color: getRatingColor(refinedRating) }]}>
-                      {refinedRating.toFixed(1)}/10
-                    </ThemedText>
+            </View>
+  
+            {/* Comparison Section */}
+            {sessionComparisons.length > 0 &&
+              finalIndex === null && (
+                <View style={styles.comparisonSection}>
+                  <ThemedText style={styles.sectionTitle}>
+                    Which do you prefer?
+                  </ThemedText>
+                  <ThemedText style={styles.comparisonSubtitle}>
+                    Help refine your rating by comparing with your other experiences
+                  </ThemedText>
+  
+                  <View style={styles.comparisonContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.comparisonCard, 
+                        styles.comparisonChoice,
+                        baseRating === null && styles.comparisonCardDisabled
+                      ]}
+                      onPress={() => baseRating !== null && handleComparison('new')}
+                      disabled={baseRating === null}
+                    >
+                      <ThemedText style={[
+                        styles.comparisonName,
+                        baseRating === null && styles.comparisonTextDisabled
+                      ]}>
+                        {spot.name}
+                      </ThemedText>
+                      <ThemedText style={[
+                        styles.comparisonSubtext,
+                        baseRating === null && styles.comparisonTextDisabled
+                      ]}>
+                        {baseRating === null ? 'Select rating first' : 'This one'}
+                      </ThemedText>
+                    </TouchableOpacity>
+
+                    <ThemedText style={styles.vsText}>vs</ThemedText>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.comparisonCard, 
+                        styles.comparisonChoice,
+                        baseRating === null && styles.comparisonCardDisabled
+                      ]}
+                      onPress={() => baseRating !== null && handleComparison('existing')}
+                      disabled={baseRating === null}
+                    >
+                      <ThemedText style={[
+                        styles.comparisonName,
+                        baseRating === null && styles.comparisonTextDisabled
+                      ]}>
+                        {sessionComparisons[currentIndex]?.name || 'Another Spot'}
+                      </ThemedText>
+                      <ThemedText style={[
+                        styles.comparisonSubtext,
+                        baseRating === null && styles.comparisonTextDisabled
+                      ]}>
+                        {baseRating === null ? 'Select rating first' : 'That one'}
+                      </ThemedText>
+                    </TouchableOpacity>
                   </View>
+  
+                  {/* Progress bar */}
+                  {comparisonCount > 0 && (
+                    <View style={styles.progressWrapper}>
+                      <View
+                        style={[
+                          styles.progressBar,
+                          {
+                            width: `${Math.min(
+                              100,
+                              (comparisonCount /
+                                (sessionComparisons.length + 1)) *
+                                100
+                            )}%`,
+                          },
+                        ]}
+                      />
+                    </View>
+                  )}
                 </View>
               )}
-            </View>
-
-            {/* Comparison Section */}
-            {comparisonSpots.length > 0 && baseRating !== null && finalIndex === null && (
-              <View style={styles.comparisonSection}>
-                <ThemedText style={styles.sectionTitle}>Which do you prefer?</ThemedText>
-                <ThemedText style={styles.comparisonSubtitle}>
-                  Help us refine your rating by comparing with your other experiences
-                </ThemedText>
-                <View style={styles.comparisonContainer}>
-                  <TouchableOpacity
-                    style={[styles.comparisonCard, { borderColor: getRatingColor(refinedRating || baseRating) }]}
-                    onPress={() => handleComparison('new')}
+  
+            {/* Final Rating (only after comparisons or immediate finalization) */}
+            {finalIndex !== null && refinedRating !== null && (
+              <View
+                style={[
+                  styles.ratingDisplay,
+                  { backgroundColor: getRatingBackgroundColor(refinedRating) },
+                ]}
+              >
+                <ThemedText style={styles.ratingLabel}>Your Rating</ThemedText>
+                <View style={styles.ratingValueContainer}>
+                  <ThemedText
+                    style={[
+                      styles.ratingValue,
+                      { color: getRatingColor(refinedRating) },
+                    ]}
                   >
-                    <ThemedText style={styles.comparisonName}>{spot.name}</ThemedText>
-                    <ThemedText style={[styles.comparisonScore, { color: getRatingColor(refinedRating || baseRating) }]}>
-                      Current: {refinedRating?.toFixed(1) || baseRating.toFixed(1)}
-                    </ThemedText>
-                    <ThemedText style={styles.comparisonSubtext}>
-                      {spot.averageRating > 0 ? `Avg: ${spot.averageRating.toFixed(1)}` : 'New spot'}
-                    </ThemedText>
-                  </TouchableOpacity>
-
-                  <View style={styles.orSeparator}>
-                    <ThemedText style={styles.orText}>OR</ThemedText>
-                  </View>
-
-                  <TouchableOpacity
-                    style={styles.comparisonCard}
-                    onPress={() => handleComparison('existing')}
-                  >
-                    <ThemedText style={styles.comparisonName}>
-                      {comparisonSpots[currentIndex]?.name || 'Another Spot'}
-                    </ThemedText>
-                    <ThemedText style={styles.comparisonScore}>
-                      {comparisonSpots[currentIndex]?.averageRating?.toFixed(1) || 'N/A'}
-                    </ThemedText>
-                    <ThemedText style={styles.comparisonSubtext}>
-                      Your experience
-                    </ThemedText>
-                  </TouchableOpacity>
+                    {refinedRating.toFixed(1)}/10
+                  </ThemedText>
                 </View>
-                
-                {/* Progress indicator */}
-                {comparisonCount > 0 && (
-                  <View style={styles.progressContainer}>
-                    <ThemedText style={styles.progressText}>
-                      Refining rating... ({comparisonCount} comparisons)
-                    </ThemedText>
-                  </View>
-                )}
               </View>
             )}
-
+  
             {/* Note Section */}
             {baseRating !== null && (
               <View style={styles.noteSection}>
-                <ThemedText style={styles.sectionTitle}>Add a note (optional)</ThemedText>
+                <ThemedText style={styles.sectionTitle}>
+                  Add a note (optional)
+                </ThemedText>
                 <View style={styles.noteInputContainer}>
                   <TextInput
                     style={styles.noteInput}
@@ -321,21 +407,29 @@ export default function RankingPopup({
                 </View>
               </View>
             )}
-
+  
             {/* Submit */}
             {baseRating !== null && (
               <View style={styles.submitSection}>
                 <TouchableOpacity
                   style={[
-                    styles.submitButton, 
-                    { backgroundColor: getRatingColor(refinedRating || baseRating) },
-                    isSubmitting && styles.submitButtonDisabled
+                    styles.submitButton,
+                    {
+                      backgroundColor: getRatingColor(
+                        refinedRating || baseRating
+                      ),
+                    },
+                    isSubmitting && styles.submitButtonDisabled,
                   ]}
                   onPress={handleSubmit}
                   disabled={isSubmitting}
                 >
                   <ThemedText style={styles.submitButtonText}>
-                    {isSubmitting ? 'Saving...' : `Save Rating (${refinedRating?.toFixed(1) || baseRating.toFixed(1)})`}
+                    {isSubmitting
+                      ? 'Saving...'
+                      : finalIndex !== null && refinedRating !== null
+                      ? `Save Rating (${refinedRating.toFixed(1)})`
+                      : 'Save Rating'}
                   </ThemedText>
                 </TouchableOpacity>
               </View>
@@ -344,7 +438,7 @@ export default function RankingPopup({
         </View>
       </View>
     </Modal>
-  );
+  );  
 }
 
 const styles = StyleSheet.create({
@@ -580,5 +674,46 @@ const styles = StyleSheet.create({
     color: '#fff', 
     fontWeight: '700',
     fontSize: 16
+  },
+  comparisonChoice: {
+    flex: 1,
+    padding: 20,
+    borderRadius: 16,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  vsText: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginHorizontal: 12,
+    color: '#6B7280',
+  },
+  progressWrapper: {
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    marginTop: 12,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#10B981',
+    borderRadius: 4,
+  },
+  comparisonCardDisabled: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#D1D5DB',
+    opacity: 0.6,
+  },
+  comparisonTextDisabled: {
+    color: '#9CA3AF',
   },
 });

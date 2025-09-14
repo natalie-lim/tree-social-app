@@ -4,7 +4,6 @@ import { ThemedText } from "@/components/themed-text";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Image,
   SafeAreaView,
   ScrollView,
@@ -13,7 +12,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { CuteLoading } from "../../components/CuteLoading";
 import { useAuth } from "../../contexts/AuthContext";
+import { useRefresh } from "../../contexts/RefreshContext";
 import { firestoreService } from "../../services/firestore";
 import { userService } from "../../services/natureApp";
 
@@ -80,6 +81,7 @@ const ListRow = ({ icon = "✓", label, value, onPress }: ListRowProps) => (
 
 export default function Profile() {
   const { user, loading: authLoading, signOut } = useAuth();
+  const { shouldRefreshProfile, clearRefreshFlag } = useRefresh();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userRankings, setUserRankings] = useState<UserRanking[]>([]);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -104,12 +106,12 @@ export default function Profile() {
       const rankingIds = profile.rankings.map((ranking) => ranking.rankingId);
       const fullRankings: UserRanking[] = [];
 
-      // Fetch each ranking document individually
+      // Fetch each ranking document individually (lightweight for display)
       for (const rankingId of rankingIds) {
         try {
           const rankingDoc = await firestoreService.read("rankings", rankingId);
           if (rankingDoc) {
-            // Ensure the document has the required fields
+            // Create ranking with minimal data for display
             const ranking: UserRanking = {
               rankingId: rankingDoc.id || rankingId,
               spotId: (rankingDoc as any).spotId || "",
@@ -119,6 +121,8 @@ export default function Profile() {
               note: (rankingDoc as any).note || "",
               createdAt: (rankingDoc as any).createdAt,
               updatedAt: (rankingDoc as any).updatedAt,
+              // Don't fetch full spot data here - will be loaded on demand
+              spotData: null,
             };
             fullRankings.push(ranking);
           }
@@ -138,6 +142,7 @@ export default function Profile() {
               note: "No notes available",
               createdAt: profileRanking.createdAt,
               updatedAt: profileRanking.createdAt,
+              spotData: null,
             });
           }
         }
@@ -196,6 +201,15 @@ export default function Profile() {
     fetchUserProfile();
   }, [user]);
 
+  // Handle refresh trigger from tab press
+  useEffect(() => {
+    if (shouldRefreshProfile && user) {
+      console.log("Refreshing profile due to tab press");
+      refreshProfile();
+      clearRefreshFlag();
+    }
+  }, [shouldRefreshProfile, user]);
+
   // Add refresh functionality
   const refreshProfile = async () => {
     if (!user) return;
@@ -220,6 +234,123 @@ export default function Profile() {
     }
   };
 
+  // Function to fetch full spot data on demand
+  const fetchSpotDataOnDemand = async (ranking: UserRanking) => {
+    if (ranking.spotData) {
+      // Already have spot data, navigate directly
+      return ranking.spotData;
+    }
+
+    if (!ranking.spotId) {
+      // No spot ID, return fallback data
+      return {
+        id: ranking.spotId,
+        name: ranking.spotName,
+        description: ranking.note || "No description available",
+        category: "No category",
+        location: {
+          address: ranking.spotLocation,
+          coordinates: {
+            latitude: 0,
+            longitude: 0,
+          },
+        },
+        photos: [],
+        amenities: [],
+        averageRating: ranking.rating,
+        reviewCount: 1,
+        totalRatings: 1,
+        bestTimeToVisit: [],
+        difficulty: "varies",
+        distance: "",
+        duration: "",
+        elevation: "",
+        isVerified: false,
+        npsCode: "",
+        website: "",
+        tags: [],
+        createdAt: ranking.createdAt || new Date(),
+        createdBy: user?.uid || "",
+        source: "USER_ADDED",
+        updatedAt: ranking.updatedAt || new Date(),
+      };
+    }
+
+    try {
+      // Fetch full spot data
+      const spotData = await firestoreService.read("spots", ranking.spotId);
+      if (spotData) {
+        return {
+          id: spotData.id || ranking.spotId,
+          name: (spotData as any).name || ranking.spotName || "",
+          description:
+            (spotData as any).description || "No description available",
+          category: (spotData as any).category || "No category",
+          location: (spotData as any).location || {
+            address: ranking.spotLocation || "Unknown Location",
+            coordinates: (spotData as any).location?.coordinates || {
+              latitude: 0,
+              longitude: 0,
+            },
+          },
+          photos: (spotData as any).photos || [],
+          amenities: (spotData as any).amenities || [],
+          averageRating: (spotData as any).averageRating || 0,
+          reviewCount: (spotData as any).reviewCount || 0,
+          totalRatings: (spotData as any).totalRatings || 0,
+          bestTimeToVisit: (spotData as any).bestTimeToVisit || [],
+          difficulty: (spotData as any).difficulty || "varies",
+          distance: (spotData as any).distance || "",
+          duration: (spotData as any).duration || "",
+          elevation: (spotData as any).elevation || "",
+          isVerified: (spotData as any).isVerified || false,
+          npsCode: (spotData as any).npsCode || "",
+          website: (spotData as any).website || "",
+          tags: (spotData as any).tags || [],
+          createdAt: (spotData as any).createdAt || new Date(),
+          createdBy: (spotData as any).createdBy || "",
+          source: (spotData as any).source || "USER_ADDED",
+          updatedAt: (spotData as any).updatedAt || new Date(),
+        };
+      }
+    } catch (err) {
+      console.warn(`Could not fetch spot ${ranking.spotId}:`, err);
+    }
+
+    // Fallback if spot data fetch fails
+    return {
+      id: ranking.spotId,
+      name: ranking.spotName,
+      description: ranking.note || "No description available",
+      category: "No category",
+      location: {
+        address: ranking.spotLocation,
+        coordinates: {
+          latitude: 0,
+          longitude: 0,
+        },
+      },
+      photos: [],
+      amenities: [],
+      averageRating: ranking.rating,
+      reviewCount: 1,
+      totalRatings: 1,
+      bestTimeToVisit: [],
+      difficulty: "varies",
+      distance: "",
+      duration: "",
+      elevation: "",
+      isVerified: false,
+      npsCode: "",
+      website: "",
+      tags: [],
+      createdAt: ranking.createdAt || new Date(),
+      createdBy: user?.uid || "",
+      source: "USER_ADDED",
+      updatedAt: ranking.updatedAt || new Date(),
+    };
+  };
+
   const formatJoinDate = (timestamp: any) => {
     if (!timestamp) return "joined recently";
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -242,10 +373,11 @@ export default function Profile() {
   if (authLoading || profileLoading) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={PALETTE.accent} />
-          <Text style={styles.loadingText}>Loading profile...</Text>
-        </View>
+        <CuteLoading
+          message="Loading your profile..."
+          size="medium"
+          showMessage={true}
+        />
       </SafeAreaView>
     );
   }
@@ -401,42 +533,13 @@ export default function Profile() {
                   <RankedCard
                     key={ranking.rankingId}
                     ranking={ranking}
-                    onPress={(ranking) => {
+                    onPress={async (ranking) => {
+                      // Fetch full spot data on demand
+                      const spotData = await fetchSpotDataOnDemand(ranking);
                       router.push({
                         pathname: "/spot-detail",
                         params: {
-                          spotData: JSON.stringify({
-                            id: ranking.spotId,
-                            name: ranking.spotName,
-                            description:
-                              ranking.note || "No description available",
-                            category: "parks_nature",
-                            location: {
-                              address: ranking.spotLocation,
-                              coordinates: {
-                                latitude: 0,
-                                longitude: 0,
-                              },
-                            },
-                            photos: [],
-                            amenities: [],
-                            averageRating: ranking.rating,
-                            reviewCount: 1,
-                            totalRatings: 1,
-                            bestTimeToVisit: [],
-                            difficulty: "varies",
-                            distance: "",
-                            duration: "",
-                            elevation: "",
-                            isVerified: false,
-                            npsCode: "",
-                            website: "",
-                            tags: [],
-                            createdAt: ranking.createdAt || new Date(),
-                            createdBy: user?.uid || "",
-                            source: "USER_ADDED",
-                            updatedAt: ranking.updatedAt || new Date(),
-                          }),
+                          spotData: JSON.stringify(spotData),
                         },
                       });
                     }}

@@ -1,3 +1,4 @@
+import { getRatingColor } from '@/utils/ratingColors';
 import React from 'react';
 import {
     Dimensions,
@@ -18,6 +19,7 @@ export interface UserRanking {
   note?: string;
   createdAt: any;
   updatedAt: any;
+  spotData?: any; // Full spot data for navigation
 }
 
 interface SlimRankedCardProps {
@@ -29,8 +31,9 @@ interface SlimRankedCardProps {
 
 const { width } = Dimensions.get('window');
 
+
 export function SlimRankedCard({ ranking, rankNumber, onPress, style }: SlimRankedCardProps) {
-  const accentColor = '#6FA076'; // Your app's accent color
+  const ratingColor = getRatingColor(ranking.rating);
 
   return (
     <Pressable 
@@ -56,7 +59,7 @@ export function SlimRankedCard({ ranking, rankNumber, onPress, style }: SlimRank
           </View>
           
           {/* Right side - Rating circle */}
-          <View style={styles.ratingCircle}>
+          <View style={[styles.ratingCircle, { backgroundColor: ratingColor }]}>
             <Text style={styles.ratingText}>{ranking.rating.toFixed(1)}</Text>
           </View>
         </View>
@@ -121,9 +124,13 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#6FA076',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   ratingText: {
     color: '#FFFFFF',

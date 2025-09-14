@@ -1,4 +1,5 @@
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
+import { getRatingColor } from '@/utils/ratingColors';
 import React, { useEffect, useState } from "react";
 import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { db } from "../config/firebase";
@@ -55,7 +56,8 @@ interface SpotCardProps {
   userNotes?: string;
 }
 
-const { width } = Dimensions.get("window");
+const { width } = Dimensions.get('window');
+
 
 export function SpotCard({
   spot,

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "tree-social-app",
-    "slug": "tree-social-app",
+    "name": "Leaflet",
+    "slug": "leaflet-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "treesocialapp",
+    "scheme": "leafletapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

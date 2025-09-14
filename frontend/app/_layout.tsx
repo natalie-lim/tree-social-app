@@ -8,6 +8,7 @@ import '../global.css';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider } from '../contexts/AuthContext';
+import { RefreshProvider } from '../contexts/RefreshContext';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -28,18 +29,21 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="spot-detail" options={{ headerShown: false }} />
-          <Stack.Screen name="add-place" options={{ headerShown: false }} />
-          <Stack.Screen name="ranking" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
+      <RefreshProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="spot-detail" options={{ headerShown: false }} />
+            <Stack.Screen name="add-place" options={{ headerShown: false }} />
+            <Stack.Screen name="ranking" options={{ headerShown: false }} />
+            <Stack.Screen name="user-rankings" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </RefreshProvider>
     </AuthProvider>
   );
 }

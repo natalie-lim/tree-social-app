@@ -63,7 +63,6 @@ export default function RankingPopup({
   isSubmitting = false,
   comparisonSpots = [],
 }: RankingPopupProps) {
-  console.log('RankingPopup rendered with props:', { visible, spot: spot?.name, comparisonSpots: comparisonSpots.length });
   const [baseRating, setBaseRating] = useState<number | null>(null);
   const [note, setNote] = useState('');
 
@@ -85,6 +84,14 @@ export default function RankingPopup({
 
   // Guard against rapid double taps during a step
   const [lockStep, setLockStep] = useState(false);
+
+  // Log rating changes only when they actually change
+  useEffect(() => {
+    if (refinedRating !== null || baseRating !== null) {
+      const displayRating = refinedRating?.toFixed(1) || baseRating?.toFixed(1);
+      console.log('Rating updated:', { refinedRating, baseRating, displayRating });
+    }
+  }, [refinedRating, baseRating]);
 
   // Build frozen, duplicate-free snapshot when modal opens (or spot changes)
   useEffect(() => {
@@ -228,11 +235,22 @@ export default function RankingPopup({
       }
 
       // Compute final numeric rating:
-      // - If we've got a final index → normalized 1–10 from placement
+      // - If we've got a final index → use the refined rating that was calculated during comparisons
       // - Else fall back to the base rating
-      const finalRating = insertAt !== null
-        ? indexToScore(insertAt, n, maxAllowedScore || undefined, minAllowedScore || undefined)
+      const finalRating = insertAt !== null && refinedRating !== null
+        ? refinedRating
         : baseRating;
+
+      console.log('RankingPopup final rating calculation:', {
+        baseRating,
+        refinedRating,
+        insertAt,
+        finalIndex,
+        n: sessionComparisons.length,
+        finalRating,
+        maxAllowedScore,
+        minAllowedScore
+      });
 
       // Build the new ranked list in-place relative to the frozen snapshot
       const rankedList = [...sessionComparisons];
@@ -257,8 +275,6 @@ export default function RankingPopup({
     setMinAllowedScore(null);
     onClose();
   };
-
-  console.log('RankingPopup render check:', { visible, spot: spot?.name, hasSpot: !!spot });
 
   if (!spot) {
     console.log('No spot provided, returning null');

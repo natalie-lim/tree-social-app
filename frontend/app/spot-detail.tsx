@@ -222,6 +222,7 @@ export default function SpotDetailPage() {
   const handleSubmitRanking = async (rating: number, note: string, rankedList: Spot[]) => {
     if (!spot) return;
 
+    console.log('handleSubmitRanking called with rating:', rating, 'note:', note);
     setIsSubmitting(true);
     try {
       const currentUser = auth.currentUser;
@@ -268,23 +269,12 @@ export default function SpotDetailPage() {
         });
       }
 
-      // Update spot's average rating
-      try {
-        const currentRating = spot.averageRating || 0;
-        const currentCount = spot.reviewCount || 0;
-        const newAverage = ((currentRating * currentCount) + rating) / (currentCount + 1);
-        
-        await firestoreService.update('spots', spot.id, {
-          averageRating: Math.round(newAverage * 10) / 10,
-          reviewCount: currentCount + 1,
-          totalRatings: (spot.totalRatings || 0) + 1,
-          updatedAt: new Date()
-        });
-      } catch (updateError: any) {
-        console.warn('Could not update spot in Firestore:', updateError.message);
-      }
+      // Note: We don't update the spot's averageRating here because this is a personal ranking,
+      // not a review. The spot's averageRating should only be updated when actual reviews are created.
+      // Personal rankings are stored separately in the user's profile and rankings collection.
 
       // Update local state
+      console.log('Setting user rating to:', rating);
       setIsRanked(true);
       setUserRating(rating);
       setShowRankingPopup(false);

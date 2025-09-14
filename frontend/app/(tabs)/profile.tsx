@@ -249,7 +249,7 @@ export default function Profile() {
       
       // Then fetch the updated profile
       const profile = await userService.getUserProfile(user.uid);
-      console.log('Refreshed user profile:', profile); // Debug log
+      console.log('Refreshed user profile'); // Debug log
       setUserProfile(profile as UserProfile);
 
       // Fetch full ranking documents

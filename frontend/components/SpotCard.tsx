@@ -192,7 +192,7 @@ export function SpotCard({
           </View>
 
           {/* Right side - Rating circle */}
-          {(userRating && userRating > 0) ? (
+          {userRating !== undefined && userRating !== null ? (
             <View
               style={[
                 styles.ratingCircle,
@@ -203,7 +203,7 @@ export function SpotCard({
                 {userRating.toFixed(1)}
               </Text>
             </View>
-          ) : spot.averageRating > 0 ? (
+          ) : spot.averageRating !== undefined && spot.averageRating !== null && spot.averageRating > 0 ? (
             <View
               style={[
                 styles.ratingCircle,
@@ -214,7 +214,18 @@ export function SpotCard({
                 {spot.averageRating.toFixed(1)}
               </Text>
             </View>
-          ) : null}
+          ) : (
+            <View
+              style={[
+                styles.ratingCircle,
+                { backgroundColor: '#6B7280' }, // Gray for no rating
+              ]}
+            >
+              <Text style={styles.ratingText}>
+                ?
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* User Notes Section */}

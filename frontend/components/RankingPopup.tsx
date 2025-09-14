@@ -22,6 +22,7 @@ interface RankingPopupProps {
   onSubmit: (rating: number, note: string, rankedList: Spot[]) => Promise<void>;
   isSubmitting?: boolean;
   comparisonSpots?: Spot[];
+  isLoadingComparisonSpots?: boolean;
 }
 
 // Map quick category to an initial band (top / middle / bottom third)
@@ -62,6 +63,7 @@ export default function RankingPopup({
   onSubmit,
   isSubmitting = false,
   comparisonSpots = [],
+  isLoadingComparisonSpots = false,
 }: RankingPopupProps) {
   const [baseRating, setBaseRating] = useState<number | null>(null);
   const [note, setNote] = useState('');
@@ -118,7 +120,17 @@ export default function RankingPopup({
     setLeft(0);
     setRight(n - 1);
     setCurrentIndex(Math.floor((0 + Math.max(-1, n - 1)) / 2));
-  }, [visible, spot?.id]); // Removed comparisonSpots from dependencies
+  }, [visible, spot?.id]); // Removed comparisonSpots to prevent constant reloading
+
+  // Separate effect to update sessionComparisons when comparisonSpots change
+  useEffect(() => {
+    if (!visible) return;
+    
+    const filtered = (comparisonSpots || []).filter(s => s && s.id !== spot?.id);
+    setSessionComparisons(filtered);
+    
+    // Don't reset comparison state here - let it stay stable during comparisons
+  }, [comparisonSpots, visible, spot?.id]);
 
   const handleRatingPress = (bucket: 'liked' | 'fine' | 'disliked') => {
     setSelectedBucket(bucket);
@@ -245,12 +257,12 @@ export default function RankingPopup({
           <View style={styles.contentContainer}>
             {/* Quick Rating */}
             <View style={styles.ratingSection}>
-              <ThemedText style={styles.sectionTitle}>How was it?</ThemedText>
+              <ThemedText style={styles.sectionTitle}>How was your experience?</ThemedText>
               <View style={styles.ratingContainer}>
                 {[
-                  { label: 'I liked it!', bucket: 'liked', color: '#4CAF50' },
-                  { label: 'It was fine', bucket: 'fine', color: '#FFD700' },
-                  { label: "I didn't like it", bucket: 'disliked', color: '#EF4444' },
+                  { label: 'I enjoyed it', bucket: 'liked', color: '#2D5016' },
+                  { label: 'It was fine', bucket: 'fine', color: '#8B5A2B' },
+                  { label: "I did not enjoy it", bucket: 'disliked', color: '#8B4513' },
                 ].map(({ label, bucket, color }) => (
                   <TouchableOpacity
                     key={bucket}
@@ -284,37 +296,30 @@ export default function RankingPopup({
             </View>
   
             {/* Comparison Section */}
-            {sessionComparisons.length > 0 &&
-              finalIndex === null && (
+            {(sessionComparisons.length > 0 || isLoadingComparisonSpots) && (
                 <View style={styles.comparisonSection}>
-                  <ThemedText style={styles.sectionTitle}>
-                    Which do you prefer?
-                  </ThemedText>
-                  <ThemedText style={styles.comparisonSubtitle}>
-                    Help refine your rating by comparing with your other experiences
-                  </ThemedText>
   
                   <View style={styles.comparisonContainer}>
                     <TouchableOpacity
                       style={[
                         styles.comparisonCard, 
                         styles.comparisonChoice,
-                        baseRating === null && styles.comparisonCardDisabled
+                        (baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0)) && styles.comparisonCardDisabled
                       ]}
-                      onPress={() => baseRating !== null && handleComparison('new')}
-                      disabled={baseRating === null}
+                      onPress={() => baseRating !== null && finalIndex === null && !(isLoadingComparisonSpots && sessionComparisons.length === 0) && handleComparison('new')}
+                      disabled={baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0)}
                     >
                       <ThemedText style={[
                         styles.comparisonName,
-                        baseRating === null && styles.comparisonTextDisabled
+                        (baseRating === null || finalIndex !== null || isLoadingComparisonSpots) && styles.comparisonTextDisabled
                       ]}>
                         {spot.name}
                       </ThemedText>
                       <ThemedText style={[
                         styles.comparisonSubtext,
-                        baseRating === null && styles.comparisonTextDisabled
+                        (baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0)) && styles.comparisonTextDisabled
                       ]}>
-                        {baseRating === null ? 'Select rating first' : 'This one'}
+                        {(isLoadingComparisonSpots && sessionComparisons.length === 0) ? 'Loading...' : baseRating === null ? 'Select rating first' : finalIndex !== null ? 'Comparison complete' : 'This one'}
                       </ThemedText>
                     </TouchableOpacity>
 
@@ -324,44 +329,25 @@ export default function RankingPopup({
                       style={[
                         styles.comparisonCard, 
                         styles.comparisonChoice,
-                        baseRating === null && styles.comparisonCardDisabled
+                        (baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0)) && styles.comparisonCardDisabled
                       ]}
-                      onPress={() => baseRating !== null && handleComparison('existing')}
-                      disabled={baseRating === null}
+                      onPress={() => baseRating !== null && finalIndex === null && !(isLoadingComparisonSpots && sessionComparisons.length === 0) && handleComparison('existing')}
+                      disabled={baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0)}
                     >
                       <ThemedText style={[
                         styles.comparisonName,
-                        baseRating === null && styles.comparisonTextDisabled
+                        (baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0)) && styles.comparisonTextDisabled
                       ]}>
-                        {sessionComparisons[currentIndex]?.name || 'Another Spot'}
+                        {(isLoadingComparisonSpots && sessionComparisons.length === 0) ? 'Loading...' : sessionComparisons[Math.max(0, Math.min(currentIndex, sessionComparisons.length - 1))]?.name || 'Another Spot'}
                       </ThemedText>
                       <ThemedText style={[
                         styles.comparisonSubtext,
-                        baseRating === null && styles.comparisonTextDisabled
+                        (baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0)) && styles.comparisonTextDisabled
                       ]}>
-                        {baseRating === null ? 'Select rating first' : 'That one'}
+                        {(isLoadingComparisonSpots && sessionComparisons.length === 0) ? 'Loading...' : baseRating === null ? 'Select rating first' : finalIndex !== null ? 'Comparison complete' : 'That one'}
                       </ThemedText>
                     </TouchableOpacity>
                   </View>
-  
-                  {/* Progress bar */}
-                  {comparisonCount > 0 && (
-                    <View style={styles.progressWrapper}>
-                      <View
-                        style={[
-                          styles.progressBar,
-                          {
-                            width: `${Math.min(
-                              100,
-                              (comparisonCount /
-                                (sessionComparisons.length + 1)) *
-                                100
-                            )}%`,
-                          },
-                        ]}
-                      />
-                    </View>
-                  )}
                 </View>
               )}
   
@@ -403,6 +389,8 @@ export default function RankingPopup({
                     multiline
                     numberOfLines={3}
                     textAlignVertical="top"
+                    returnKeyType="done"
+                    blurOnSubmit={true}
                   />
                 </View>
               </View>
@@ -503,24 +491,24 @@ const styles = StyleSheet.create({
   },
   ratingSection: { 
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16
+    paddingTop: 12,
+    paddingBottom: 6
   },
   ratingContainer: { 
     flexDirection: 'row', 
     justifyContent: 'space-around',
-    marginBottom: 16
+    marginBottom: 8
   },
   ratingButton: { 
     flex: 1, 
     marginHorizontal: 4, 
-    padding: 16, 
-    borderRadius: 12, 
-    backgroundColor: '#ffffff', 
+    padding: 12, 
+    borderRadius: 16, 
+    backgroundColor: '#F8F9FA', 
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#e0e0e0',
-    shadowColor: '#000',
+    borderColor: '#E8F5E8',
+    shadowColor: '#2D5016',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -555,7 +543,7 @@ const styles = StyleSheet.create({
   },
   comparisonSection: { 
     paddingHorizontal: 20,
-    paddingVertical: 16
+    paddingVertical: 4
   },
   comparisonSubtitle: {
     fontSize: 14,
@@ -597,10 +585,10 @@ const styles = StyleSheet.create({
     marginBottom: 2
   },
   comparisonSubtext: {
-    fontSize: 12,
-    color: '#1a1a1a',
+    fontSize: 10,
+    color: '#2D5016',
     fontStyle: 'italic',
-    fontWeight: '500'
+    fontWeight: '600'
   },
   orSeparator: { 
     paddingHorizontal: 8 
@@ -631,7 +619,7 @@ const styles = StyleSheet.create({
   },
   noteSection: { 
     paddingHorizontal: 20,
-    paddingVertical: 16
+    paddingVertical: 4
   },
   noteInputContainer: { 
     backgroundColor: '#ffffff', 
@@ -654,8 +642,8 @@ const styles = StyleSheet.create({
   },
   submitSection: { 
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20
+    paddingTop: 4,
+    paddingBottom: 16
   },
   submitButton: { 
     borderRadius: 16, 

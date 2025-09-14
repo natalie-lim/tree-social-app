@@ -2,12 +2,19 @@
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 const COLORS = {
-  bg: "#FFF6EC",     // soft cream
-  brand: "#2F4A43",  // deep green (logo / active)
-  chip: "#1F5B4E",   // dark teal for buttons
+  bg: "#FFF6EC", // soft cream
+  brand: "#2F4A43", // deep green (logo / active)
+  chip: "#1F5B4E", // dark teal for buttons
   chipText: "#FFFFFF",
   text: "#222326",
   sub: "#6F7276",
@@ -17,14 +24,22 @@ const COLORS = {
 
 export default function Feed() {
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: 60, paddingBottom: 24 }}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={{ paddingTop: 60, paddingBottom: 24 }}
+    >
       {/* Top bar */}
       <View style={styles.topRow}>
         <Text style={styles.brand}>leaflet</Text>
 
         <View style={styles.icons}>
           <Ionicons name="calendar-outline" size={22} color={COLORS.text} />
-          <Ionicons name="notifications-outline" size={22} color={COLORS.text} style={{ marginLeft: 14 }} />
+          <Ionicons
+            name="notifications-outline"
+            size={22}
+            color={COLORS.text}
+            style={{ marginLeft: 14 }}
+          />
         </View>
       </View>
 
@@ -35,15 +50,28 @@ export default function Feed() {
           placeholder="Search a place, member, etc."
           placeholderTextColor={COLORS.sub}
           style={styles.searchInput}
-          onSubmitEditing={(e) => router.push({ pathname: "/(tabs)/search", params: { q: e.nativeEvent.text } })}
+          onSubmitEditing={(e) =>
+            router.push({
+              pathname: "/(tabs)/search",
+              params: { q: e.nativeEvent.text },
+            })
+          }
           returnKeyType="search"
         />
       </View>
 
       {/* Pills row */}
       <View style={styles.pillsRow}>
-        <Pill icon="calendar-outline" label="Add Place" onPress={() => router.push("/add-place")} />
-        <Pill icon="navigate-outline" label="Open Map" onPress={() => router.push("/map")} />
+        <Pill
+          icon="calendar-outline"
+          label="Add Place"
+          onPress={() => router.push("/add-place")}
+        />
+        <Pill
+          icon="navigate-outline"
+          label="Open Map"
+          onPress={() => router.push("/map")}
+        />
       </View>
 
       {/* Activity Feed */}
@@ -53,49 +81,53 @@ export default function Feed() {
           onActivityPress={(activity) => {
             // Navigate to spot detail
             router.push({
-              pathname: '/spot-detail',
+              pathname: "/spot-detail",
               params: {
                 spotData: JSON.stringify({
                   id: activity.spotId,
                   name: activity.spotName,
-                  description: activity.note || 'No description available',
-                  category: 'parks_nature',
-                  location: { 
+                  description: activity.note || "No description available",
+                  category: "parks_nature",
+                  location: {
                     address: activity.spotLocation,
                     coordinates: {
                       latitude: 0,
-                      longitude: 0
-                    }
+                      longitude: 0,
+                    },
                   },
-                  photos: activity.spotImage ? [{ 
-                    url: activity.spotImage,
-                    caption: activity.spotName,
-                    credit: 'User Upload'
-                  }] : [],
+                  photos: activity.spotImage
+                    ? [
+                        {
+                          url: activity.spotImage,
+                          caption: activity.spotName,
+                          credit: "User Upload",
+                        },
+                      ]
+                    : [],
                   amenities: [],
                   averageRating: activity.rating || 0,
                   reviewCount: 0,
                   totalRatings: 0,
                   bestTimeToVisit: [],
-                  difficulty: 'varies',
-                  distance: '',
-                  duration: '',
-                  elevation: '',
+                  difficulty: "varies",
+                  distance: "",
+                  duration: "",
+                  elevation: "",
                   isVerified: false,
-                  npsCode: '',
-                  website: '',
+                  npsCode: "",
+                  website: "",
                   tags: [],
                   createdAt: activity.createdAt || new Date(),
                   createdBy: activity.userId,
-                  source: 'USER_ADDED',
-                  updatedAt: activity.createdAt || new Date()
-                })
-              }
+                  source: "USER_ADDED",
+                  updatedAt: activity.createdAt || new Date(),
+                }),
+              },
             });
           }}
           onCommentPress={(activityId) => {
             // Navigate to comments
-            console.log('Comment pressed:', activityId);
+            console.log("Comment pressed:", activityId);
           }}
         />
       </View>
@@ -115,7 +147,9 @@ function Pill({
   return (
     <TouchableOpacity onPress={onPress} style={styles.pill}>
       <Ionicons name={icon} size={16} color={COLORS.chipText} />
-      <Text style={styles.pillText} numberOfLines={1}>{label}</Text>
+      <Text style={styles.pillText} numberOfLines={1}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }

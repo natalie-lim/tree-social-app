@@ -1,14 +1,14 @@
 // Profile.tsx
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useAuth } from "../../contexts/AuthContext";
 import { userService } from "../../services/natureApp";
@@ -364,7 +364,6 @@ const styles = StyleSheet.create({
   notesWrap: { marginTop: 8 },
   notesLabel: { fontSize: 13, color: "#777", marginBottom: 2 },
   notesText: { fontSize: 15, fontStyle: "italic", color: "#333" },
-<<<<<<< HEAD
 
   loadingContainer: {
     flex: 1,
@@ -417,6 +416,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-=======
-});
->>>>>>> origin/main

@@ -319,8 +319,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BG,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 20,
   },
 
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
   brandRow: {
     paddingTop: 20,
     paddingBottom: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
   tabsRow: {
     flexDirection: "row",
     marginTop: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
   tab: {
     flex: 1,
@@ -444,12 +444,12 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   tabUnderlineActive: {
-    backgroundColor: COLORS.brand,
+    backgroundColor: "#2F4A43", // Nice green color
   },
 
   overlaySearchWrap: {
     marginTop: 20,
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     position: "relative",
   },
   overlayInput: {
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  scrollArea: { flex: 1, marginTop: 20, paddingHorizontal: 20 },
+  scrollArea: { flex: 1, marginTop: 20, paddingHorizontal: 16 },
 
   sectionHeaderRow: {
     marginTop: 8,

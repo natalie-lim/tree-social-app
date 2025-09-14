@@ -101,15 +101,12 @@ export default function Bookmarks() {
     fetchBookmarks(true);
   };
 
-  const handleBackPress = () => {
-    router.back();
-  };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         style={styles.screen}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingTop: 40, paddingBottom: 24 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -119,14 +116,6 @@ export default function Bookmarks() {
           />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.brand} />
-          </TouchableOpacity>
-          <Text style={styles.title}>Bookmarks</Text>
-          <View style={styles.placeholder} />
-        </View>
 
         {/* Content */}
         {loading ? (
@@ -174,24 +163,6 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     paddingHorizontal: 16,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 16,
-    marginBottom: 8,
-  },
-  backButton: {
-    padding: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: COLORS.brand,
-  },
-  placeholder: {
-    width: 40,
   },
   loadingContainer: {
     flex: 1,

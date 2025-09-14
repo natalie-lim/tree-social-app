@@ -1,6 +1,5 @@
 // user-rankings.tsx
 import { SlimRankedCard, UserRanking } from '@/components/SlimRankedCard';
-import { ThemedText } from '@/components/themed-text';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -15,20 +14,24 @@ import {
 import { firestoreService } from '../services/firestore';
 import { userService } from '../services/natureApp';
 
-const PALETTE = {
-  bg: "#F7F1E8",            // creamy background
-  card: "#FFFFFF",
-  text: "#1a1a1a",
-  subtext: "#6F7B6F",       // leaf green-ish for secondary
-  accent: "#6FA076",        // leafy green
-  accentDark: "#5C8B64",
-  divider: "#E6E0D6",
-};
+  const PALETTE = {
+    bg: "#F5F9F4",        // soft leafy background
+    card: "#F8F6F0",      // eggshell yellow
+    text: "#2E2E2E",
+    subtext: "#7A8B7A",    // muted sage green
+    accent: "#84B082",     // warm leafy green
+    accentDark: "#6E9D6E",
+    divider: "#E4EAE2",
+    highlight: "#FDF6EC",  // creamy highlight
+  };
 
 
 export default function UserRankingsPage() {
   const { userId, userName } = useLocalSearchParams();
   const [userRankings, setUserRankings] = useState<UserRanking[]>([]);
+  const [filteredRankings, setFilteredRankings] = useState<UserRanking[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -141,6 +144,7 @@ export default function UserRankingsPage() {
       });
 
       setUserRankings(sortedRankings);
+      setFilteredRankings(sortedRankings);
       setError(null);
     } catch (err) {
       console.error('Error fetching user rankings:', err);
@@ -153,6 +157,32 @@ export default function UserRankingsPage() {
     fetchUserRankings();
   }, [userId]);
 
+  // Filter rankings by category
+  useEffect(() => {
+    if (selectedCategory === 'all') {
+      setFilteredRankings(userRankings);
+    } else {
+      const filtered = userRankings.filter(ranking => 
+        ranking.spotData?.category === selectedCategory
+      );
+      setFilteredRankings(filtered);
+    }
+  }, [selectedCategory, userRankings]);
+
+  // Get unique categories from rankings
+  const getCategories = () => {
+    const categories = new Set<string>();
+    userRankings.forEach(ranking => {
+      if (ranking.spotData?.category) {
+        categories.add(ranking.spotData.category);
+      }
+    });
+    return Array.from(categories).sort();
+  };
+
+  const categories = getCategories();
+  const allCategories = ['all', ...categories];
+
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'Recently';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -161,6 +191,29 @@ export default function UserRankingsPage() {
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'all': return '•';
+      case 'z_nature': return '•';
+      case 'historical': return '•';
+      case 'recreation': return '•';
+      case 'cultural': return '•';
+      default: return '•';
+    }
+  };
+
+  const getCategoryLabel = (category: string) => {
+    switch (category) {
+      case 'all': return 'All';
+      case 'z_nature': return 'Nature';
+      case 'historical': return 'Historical';
+      case 'recreation': return 'Recreation';
+      case 'cultural': return 'Cultural';
+      default: return category;
+    }
   };
 
   if (loading) {
@@ -179,8 +232,8 @@ export default function UserRankingsPage() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>Go Back</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => router.back()}>
+            <Text style={styles.retryButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -192,18 +245,62 @@ export default function UserRankingsPage() {
       <View style={styles.root}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>← Back</Text>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backArrow}>←</Text>
           </TouchableOpacity>
-          <ThemedText style={styles.headerTitle}>
-            {userName}'s Rankings
-          </ThemedText>
+          <Text style={styles.headerTitle}>Been</Text>
+          <View style={styles.headerSpacer} />
         </View>
+
+        {/* Filter Dropdown */}
+        {categories.length > 0 && (
+          <View style={styles.filterContainer}>
+            <TouchableOpacity 
+              style={styles.dropdownButton}
+              onPress={() => setShowDropdown(!showDropdown)}
+            >
+              <Text style={styles.dropdownText}>
+                {getCategoryLabel(selectedCategory)}
+              </Text>
+              <Text style={styles.dropdownIcon}>
+                {showDropdown ? '▲' : '▼'}
+              </Text>
+            </TouchableOpacity>
+            
+            {showDropdown && (
+              <View style={styles.dropdownMenu}>
+                {allCategories.map((category) => (
+                  <TouchableOpacity
+                    key={category}
+                    style={[
+                      styles.dropdownItem,
+                      selectedCategory === category && styles.dropdownItemActive
+                    ]}
+                    onPress={() => {
+                      setSelectedCategory(category);
+                      setShowDropdown(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.dropdownItemText,
+                      selectedCategory === category && styles.dropdownItemTextActive
+                    ]}>
+                      {getCategoryLabel(category)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Rankings List */}
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          {userRankings.length > 0 ? (
-            userRankings.map((ranking, index) => (
+          {filteredRankings.length > 0 ? (
+            filteredRankings.map((ranking, index) => (
               <SlimRankedCard
                 key={ranking.rankingId}
                 ranking={ranking}
@@ -262,9 +359,14 @@ export default function UserRankingsPage() {
             ))
           ) : (
             <View style={styles.noRankingsContainer}>
-              <Text style={styles.noRankingsText}>No rankings yet</Text>
+              <Text style={styles.noRankingsText}>
+                {selectedCategory === 'all' ? 'No rankings yet' : `No ${getCategoryLabel(selectedCategory).toLowerCase()} rankings`}
+              </Text>
               <Text style={styles.noRankingsSubtext}>
-                {userName} hasn't rated any spots yet
+                {selectedCategory === 'all' 
+                  ? `${userName} hasn't rated any spots yet`
+                  : `${userName} hasn't rated any ${getCategoryLabel(selectedCategory).toLowerCase()} spots yet`
+                }
               </Text>
             </View>
           )}
@@ -283,29 +385,111 @@ const styles = StyleSheet.create({
     flex: 1, 
     backgroundColor: PALETTE.bg 
   },
-  
+
   // Header
   header: {
+    backgroundColor: 'transparent',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: PALETTE.highlight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  backArrow: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: PALETTE.accent,
+  },
+  headerTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: PALETTE.accentDark,
+    letterSpacing: 0.5,
+  },
+  headerSpacer: {
+    width: 36, // Same width as back button to center the title
+  },
+
+  // Filter Dropdown
+  filterContainer: {
+    backgroundColor: PALETTE.card,
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: PALETTE.divider,
+    position: 'relative',
+  },
+  dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: PALETTE.card,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: PALETTE.divider,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  dropdownText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: PALETTE.text,
+  },
+  dropdownIcon: {
+    fontSize: 12,
+    color: PALETTE.subtext,
+    marginLeft: 8,
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: '100%',
+    left: 20,
+    right: 20,
+    backgroundColor: PALETTE.card,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: PALETTE.divider,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 1000,
+    marginTop: 4,
+  },
+  dropdownItem: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: PALETTE.divider,
   },
-  backButton: {
-    marginRight: 16,
+  dropdownItemActive: {
+    backgroundColor: PALETTE.accent,
+    borderRadius: 20,
   },
-  backButtonText: {
+  dropdownItemText: {
     fontSize: 16,
-    color: PALETTE.accent,
-    fontWeight: '600',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontWeight: '500',
     color: PALETTE.text,
+  },
+  dropdownItemTextActive: {
+    color: '#fff',
+    fontWeight: '700',
   },
 
   // Content
@@ -314,32 +498,39 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
+    paddingTop: 20,
     paddingBottom: 40,
   },
 
   // Rankings
   rankingCard: {
-    marginBottom: 12,
+    marginBottom: 16,
+    borderRadius: 16,
+    backgroundColor: PALETTE.card,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 3,
   },
 
   // Empty state
   noRankingsContainer: {
-    backgroundColor: PALETTE.card,
-    borderRadius: 12,
-    padding: 32,
+    backgroundColor: PALETTE.highlight,
+    borderRadius: 16,
+    padding: 40,
     alignItems: 'center',
   },
   noRankingsText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: PALETTE.text,
-    marginBottom: 8,
+    fontWeight: '700',
+    color: PALETTE.accentDark,
+    marginBottom: 6,
   },
   noRankingsSubtext: {
     fontSize: 14,
     color: PALETTE.subtext,
     textAlign: 'center',
-    lineHeight: 20,
   },
 
   // Loading
@@ -368,5 +559,16 @@ const styles = StyleSheet.create({
     color: PALETTE.subtext,
     textAlign: 'center',
     marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: PALETTE.accent,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

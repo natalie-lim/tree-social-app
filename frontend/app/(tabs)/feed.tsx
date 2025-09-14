@@ -67,48 +67,22 @@ export default function Feed() {
         }
       }
 
-      // Step 3: Fetch full ranking documents from rankings collection
-      const allRankings = [];
-      for (const rankingId of allRankingIds) {
-        try {
-          const rankingDoc = await firestoreService.read("rankings", rankingId);
-          if (rankingDoc) {
-            allRankings.push({
-              ...rankingDoc,
-              id: rankingId,
-            });
-          }
-        } catch (err) {}
-      }
+      // Step 3: Fetch all rankings ordered by createdAt (most recent first)
+      const allRankings = await firestoreService.query('rankings', [], 'createdAt', 100);
 
-      // Step 4: Extract unique spotIds from rankings
-      const spotIds = [
-        ...new Set(
-          allRankings
-            .map((ranking: any) => {
-              // Extract spotId from ranking document
-              const spotId = ranking.spotId;
-              return spotId;
-            })
-            .filter(Boolean)
-        ),
-      ];
-
-      // Step 5: Get all spots and match by name
+      // Step 4: Get all spots for matching
       const allSpots = await firestoreService.getAll("spots");
 
-      // Step 6: Create spots with user information from users collection
+      // Step 5: Create spots with user information from rankings (already sorted by createdAt desc)
       const spotsWithUsers = [];
       for (const ranking of allRankings) {
         const rankingData = ranking as any; // Type assertion to access ranking properties
         const spotId = rankingData.spotId;
         const userId = rankingData.userId; // Use userId field from ranking document
 
+
         if (spotId && userId) {
-          // Skip if this ranking belongs to the current user
-          if (user && userId === user.uid) {
-            continue;
-          }
+          // Include all users' activities, including current user
 
           const matchingSpot = allSpots.find((spot) => spot.id === spotId);
           if (matchingSpot) {
@@ -133,12 +107,15 @@ export default function Feed() {
                   rankingData.note ||
                   rankingData.notes ||
                   rankingData.description,
+                createdAt: rankingData.createdAt || rankingData.timestamp,
               },
             });
           }
         }
       }
 
+      // Rankings are already sorted by createdAt desc from the query
+      // No additional sorting needed since we're processing them in order
       setSpots(spotsWithUsers as any[]);
     } catch (err) {
       console.error("Error fetching spots:", err);

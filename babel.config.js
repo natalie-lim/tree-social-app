@@ -5,7 +5,7 @@ module.exports = function (api) {
       presets: ["babel-preset-expo"],
       plugins: [
         "nativewind/babel",                // <-- add this line
-        // ...any other plugins you use
+        "react-native-iconify/plugin",  
       ],
     };
   };

@@ -1,10 +1,10 @@
-import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { getRatingColor } from "@/utils/ratingColors";
+import { router } from "expo-router";
+import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { db } from "../config/firebase";
 import { ThemedText } from "./themed-text";
-import { router } from "expo-router";
 
 // Types based on the document structure
 export interface SpotPhoto {

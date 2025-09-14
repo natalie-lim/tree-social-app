@@ -1,3 +1,5 @@
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -10,18 +12,16 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 
 // ---- Firestore (v9 modular) ----
 import {
   collection,
+  endAt,
   getDocs,
-  limit as qLimit,
   orderBy,
   query as q,
+  limit as qLimit,
   startAt,
-  endAt,
 } from "firebase/firestore";
 import { db } from "../../config/firebase"; // <-- your initialized Firestore instance
 
@@ -36,14 +36,37 @@ const BG = "#FFFAF0";
 
 type TabKey = "locations" | "members";
 
-type Spot = { id: string; name: string; name_lower?: string; city?: string; category?: string };
-type UserLite = { id: string; handle?: string; username_lower?: string; displayName?: string; rank?: number; followers?: number };
+type Spot = {
+  id: string;
+  name: string;
+  name_lower?: string;
+  city?: string;
+  category?: string;
+};
+type UserLite = {
+  id: string;
+  handle?: string;
+  username_lower?: string;
+  displayName?: string;
+  rank?: number;
+  followers?: number;
+};
 
 type ResultItem = {
   id: string;
   title: string;
   subtitle?: string;
 };
+
+function toTitleCase(str: string) {
+  return str
+    .toLowerCase()
+    .split(" ")
+    .filter(Boolean) // remove extra spaces
+    .map(w => w[0].toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
 
 export default function SearchScreen() {
   const [query, setQuery] = useState("");
@@ -152,7 +175,10 @@ export default function SearchScreen() {
         {overlayOpen && (
           <View style={styles.overlay} pointerEvents="auto">
             {/* Close (X) circle */}
-            <Pressable style={styles.closeFab} onPress={() => setOverlayOpen(false)}>
+            <Pressable
+              style={styles.closeFab}
+              onPress={() => setOverlayOpen(false)}
+            >
               <Text style={{ fontSize: 18, color: COLORS.text }}>×</Text>
             </Pressable>
 
@@ -167,21 +193,40 @@ export default function SearchScreen() {
 
               {/* Tabs */}
               <View style={styles.tabsRow}>
-                <Pressable style={styles.tab} onPress={() => setTab("locations")}>
-                  <Text style={[styles.tabLabel, tab === "locations" && styles.tabLabelActive]}>
+                <Pressable
+                  style={styles.tab}
+                  onPress={() => setTab("locations")}
+                >
+                  <Text
+                    style={[
+                      styles.tabLabel,
+                      tab === "locations" && styles.tabLabelActive,
+                    ]}
+                  >
                     Locations
                   </Text>
                   <View
-                    style={[styles.tabUnderline, tab === "locations" && styles.tabUnderlineActive]}
+                    style={[
+                      styles.tabUnderline,
+                      tab === "locations" && styles.tabUnderlineActive,
+                    ]}
                   />
                 </Pressable>
 
                 <Pressable style={styles.tab} onPress={() => setTab("members")}>
-                  <Text style={[styles.tabLabel, tab === "members" && styles.tabLabelActive]}>
+                  <Text
+                    style={[
+                      styles.tabLabel,
+                      tab === "members" && styles.tabLabelActive,
+                    ]}
+                  >
                     Members
                   </Text>
                   <View
-                    style={[styles.tabUnderline, tab === "members" && styles.tabUnderlineActive]}
+                    style={[
+                      styles.tabUnderline,
+                      tab === "members" && styles.tabUnderlineActive,
+                    ]}
                   />
                 </Pressable>
               </View>
@@ -194,7 +239,11 @@ export default function SearchScreen() {
                   value={query}
                   onChangeText={setQuery}
                   onSubmitEditing={handleSubmit}
-                  placeholder={tab === "locations" ? "Search name or place…" : "Search name or handle…"}
+                  placeholder={
+                    tab === "locations"
+                      ? "Search name or place…"
+                      : "Search name or handle…"
+                  }
                   placeholderTextColor={COLORS.subtext}
                   style={styles.overlayInput}
                   returnKeyType="search"
@@ -222,7 +271,10 @@ export default function SearchScreen() {
                     >
                       {recents.map((r) => (
                         <Pressable key={r.id} onPress={() => setQuery(r.title)}>
-                          <RecentPill name={r.title} handle={r.subtitle?.replace("@", "") || ""} />
+                          <RecentPill
+                            name={r.title}
+                            handle={r.subtitle?.replace("@", "") || ""}
+                          />
                         </Pressable>
                       ))}
                     </ScrollView>
@@ -236,15 +288,39 @@ export default function SearchScreen() {
 
                     {tab === "locations" ? (
                       <>
-                        <ResultRow title="Cafe Lumen" subtitle="Cambridge • Coffee" onPress={onSelectResult} />
-                        <ResultRow title="Shiso Kitchen" subtitle="Somerville • Japanese" onPress={onSelectResult} />
-                        <ResultRow title="Riverview Diner" subtitle="Boston • American" onPress={onSelectResult} />
+                        <ResultRow
+                          title="Cafe Lumen"
+                          subtitle="Cambridge • Coffee"
+                          onPress={onSelectResult}
+                        />
+                        <ResultRow
+                          title="Shiso Kitchen"
+                          subtitle="Somerville • Japanese"
+                          onPress={onSelectResult}
+                        />
+                        <ResultRow
+                          title="Riverview Diner"
+                          subtitle="Boston • American"
+                          onPress={onSelectResult}
+                        />
                       </>
                     ) : (
                       <>
-                        <ResultRow title="@charlie" subtitle="Rank #12 • 240 followers" onPress={onSelectResult} />
-                        <ResultRow title="@mia" subtitle="Rank #33 • 120 followers" onPress={onSelectResult} />
-                        <ResultRow title="@alex" subtitle="Rank #58 • 90 followers" onPress={onSelectResult} />
+                        <ResultRow
+                          title="@charlie"
+                          subtitle="Rank #12 • 240 followers"
+                          onPress={onSelectResult}
+                        />
+                        <ResultRow
+                          title="@mia"
+                          subtitle="Rank #33 • 120 followers"
+                          onPress={onSelectResult}
+                        />
+                        <ResultRow
+                          title="@alex"
+                          subtitle="Rank #58 • 90 followers"
+                          onPress={onSelectResult}
+                        />
                       </>
                     )}
                   </>
@@ -254,7 +330,11 @@ export default function SearchScreen() {
                       <Text style={styles.sectionTitle}>
                         {loading ? "Searching…" : error ? "Error" : "Results"}
                       </Text>
-                      {!!debounced && <Text style={{ color: COLORS.subtext }}>{debounced}</Text>}
+                      {!!debounced && (
+                        <Text style={{ color: COLORS.subtext }}>
+                          {debounced}
+                        </Text>
+                      )}
                     </View>
 
                     {error ? (
@@ -277,15 +357,11 @@ export default function SearchScreen() {
             </KeyboardAvoidingView>
           </View>
         )}
-        {/* ================= END OVERLAY ================= */}
       </ThemedView>
     </SafeAreaView>
   );
 }
 
-/* ---------- Helpers ---------- */
-
-// Debounce hook (no external deps)
 function useDebounced<T>(value: T, ms: number) {
   const [v, setV] = useState(value);
   useEffect(() => {
@@ -297,12 +373,14 @@ function useDebounced<T>(value: T, ms: number) {
 
 // Strip diacritics + lowercase to match your `*_lower` fields
 function normalize(s: string) {
-  return s
-    .normalize("NFKD")
-    // @ts-ignore — Unicode property escapes supported in Hermes/JSI RN 0.72+
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .trim();
+  return (
+    s
+      .normalize("NFKD")
+      // @ts-ignore — Unicode property escapes supported in Hermes/JSI RN 0.72+
+      .replace(/\p{Diacritic}/gu, "")
+      .toLowerCase()
+      .trim()
+  );
 }
 
 /**
@@ -313,51 +391,66 @@ function normalize(s: string) {
  *
  * NOTE: Ensure you have composite indexes if you add extra where() later.
  */
-async function searchFirestore(tab: TabKey, queryLower: string): Promise<ResultItem[]> {
-  if (!queryLower) return [];
+async function searchFirestore(tab: TabKey, queryInput: string): Promise<ResultItem[]> {
+  if (!queryInput) return [];
+
+  console.log("Searching for:", queryInput);
 
   if (tab === "locations") {
     const ref = collection(db, "spots");
+    const formattedQuery = toTitleCase(queryInput);
+    
     const queryRef = q(
       ref,
-      orderBy("name_lower"),
-      startAt(queryLower),
-      endAt(queryLower + "\uf8ff"),
+      orderBy("name"),
+      startAt(formattedQuery),
+      endAt(formattedQuery + "\uf8ff"),
       qLimit(20)
     );
     const snap = await getDocs(queryRef);
-    const items: ResultItem[] = snap.docs.map((d) => {
+    console.log("Found documents:", snap.docs.length);
+    return snap.docs.map(d => {
       const data = d.data() as Spot;
-      const subtitle = buildLocationSubtitle(data);
-      return { id: d.id, title: data.name || "(untitled)", subtitle };
+      console.log("Document data:", data);
+      return { 
+        id: d.id || `spot_${Date.now()}_${Math.random()}`, 
+        title: data?.name || "(untitled)", 
+        subtitle: buildLocationSubtitle(data) 
+      };
     });
-    return items;
   } else {
     const ref = collection(db, "users");
+    const formattedQuery = toTitleCase(queryInput);
+    
     const queryRef = q(
       ref,
-      orderBy("username_lower"),
-      startAt(queryLower),
-      endAt(queryLower + "\uf8ff"),
+      orderBy("displayName"),
+      startAt(formattedQuery),
+      endAt(formattedQuery + "\uf8ff"),
       qLimit(20)
     );
     const snap = await getDocs(queryRef);
-    const items: ResultItem[] = snap.docs.map((d) => {
+    console.log("Found users:", snap.docs.length);
+    return snap.docs.map(d => {
       const u = d.data() as UserLite;
-      const title = u.handle ? `@${u.handle}` : u.displayName || "(user)";
+      const title = u?.handle ? `@${u.handle}` : u?.displayName || "(user)";
       const subtitle =
-        u.displayName && u.handle
+        u?.displayName && u?.handle
           ? `${u.displayName}`
-          : u.followers || u.rank
+          : u?.followers || u?.rank
           ? `Rank #${u.rank ?? "-"} • ${u.followers ?? 0} followers`
           : undefined;
-      return { id: d.id, title, subtitle };
+      return { 
+        id: d.id || `user_${Date.now()}_${Math.random()}`, 
+        title, 
+        subtitle 
+      };
     });
-    return items;
   }
 }
 
 function buildLocationSubtitle(s: Spot) {
+  if (!s) return undefined;
   const bits = [s.city, s.category].filter(Boolean);
   return bits.length ? bits.join(" • ") : undefined;
 }
@@ -373,9 +466,15 @@ function ResultRow({
   subtitle?: string;
   onPress?: (item: ResultItem) => void;
 }) {
-  const item = useMemo(() => ({ id: title, title, subtitle }), [title, subtitle]);
+  const item = useMemo(
+    () => ({ id: title, title, subtitle }),
+    [title, subtitle]
+  );
   return (
-    <Pressable onPress={() => onPress?.(item)} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
+    <Pressable
+      onPress={() => onPress?.(item)}
+      style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+    >
       <View style={rowStyles.row}>
         <View style={{ flex: 1 }}>
           <Text style={rowStyles.title}>{title}</Text>
@@ -391,8 +490,12 @@ function RecentPill({ name, handle }: { name: string; handle: string }) {
   return (
     <View style={recentStyles.pill}>
       <View style={recentStyles.avatar} />
-      <Text style={recentStyles.name} numberOfLines={1}>{name}</Text>
-      <Text style={recentStyles.handle} numberOfLines={1}>{handle}</Text>
+      <Text style={recentStyles.name} numberOfLines={1}>
+        {name}
+      </Text>
+      <Text style={recentStyles.handle} numberOfLines={1}>
+        {handle}
+      </Text>
       <View style={recentStyles.closeDot}>
         <Text style={{ fontSize: 14, color: COLORS.text }}>×</Text>
       </View>
@@ -434,7 +537,10 @@ const styles = StyleSheet.create({
 
   overlay: {
     position: "absolute",
-    top: 0, right: 0, left: 0, bottom: 0,
+    top: 0,
+    right: 0,
+    left: 0,
+    bottom: 0,
     backgroundColor: BG,
     zIndex: 999,
     paddingHorizontal: 16,
@@ -551,7 +657,9 @@ const recentStyles = StyleSheet.create({
     position: "relative",
   },
   avatar: {
-    width: 64, height: 64, borderRadius: 32,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: "#E5E7EB",
     marginBottom: 6,
   },
@@ -559,10 +667,15 @@ const recentStyles = StyleSheet.create({
   handle: { fontSize: 12, color: "#6B7280" },
   closeDot: {
     position: "absolute",
-    top: 0, right: 4,
-    width: 22, height: 22, borderRadius: 11,
+    top: 0,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: "#F3F4F6",
-    alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
 });

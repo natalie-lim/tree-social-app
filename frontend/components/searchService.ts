@@ -213,20 +213,6 @@ export async function searchFirestore(
           ? `${u.followerCount} followers`
           : undefined;
 
-      // Debug logging for all user data
-      console.log("=== USER DATA DEBUG ===");
-      console.log("Document ID:", d.id);
-      console.log("User ID (auth):", u?.userId);
-      console.log("Display Name:", u?.displayName);
-      console.log("Handle:", u?.handle);
-      console.log("Bio:", u?.bio);
-      console.log("Follower Count:", u?.followerCount);
-      console.log("Following Count:", u?.followingCount);
-      console.log("Followers Array:", u?.followers);
-      console.log("Total Rankings:", u?.totalRankings);
-      console.log("Title:", title);
-      console.log("Subtitle:", subtitle);
-      console.log("========================");
 
       const memberData = {
         id: d.id,

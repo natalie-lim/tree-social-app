@@ -154,6 +154,7 @@ export default function MemberDetailScreen() {
   const [member, setMember] = useState<MemberProfile | null>(null);
   const [memberRankings, setMemberRankings] = useState<UserRanking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rankingsLoading, setRankingsLoading] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -204,6 +205,7 @@ export default function MemberDetailScreen() {
       if (!member) return;
 
       try {
+        setRankingsLoading(true);
         // Get the member's full profile to access rankings
         const fullMemberProfile = (await userService.getUserProfile(
           member.userId
@@ -270,6 +272,8 @@ export default function MemberDetailScreen() {
         }
       } catch (err) {
         console.error("Error fetching member rankings:", err);
+      } finally {
+        setRankingsLoading(false);
       }
     };
 
@@ -621,7 +625,14 @@ export default function MemberDetailScreen() {
             <ThemedText style={styles.rankingsSectionTitle}>
               {displayName}'s Recent Rankings
             </ThemedText>
-            {memberRankings.length > 0 ? (
+            {rankingsLoading ? (
+              <View style={styles.rankingsLoadingContainer}>
+                <ActivityIndicator size="small" color={PALETTE.accent} />
+                <Text style={styles.rankingsLoadingText}>
+                  Loading rankings...
+                </Text>
+              </View>
+            ) : memberRankings.length > 0 ? (
               <View style={styles.rankingsList}>
                 {memberRankings.slice(0, 3).map((ranking) => (
                   <RankedCard
@@ -831,6 +842,19 @@ const styles = StyleSheet.create({
   },
   rankingsList: { gap: 12 },
   rankingCard: { marginBottom: 0 },
+
+  // Loading state
+  rankingsLoadingContainer: {
+    backgroundColor: PALETTE.card,
+    borderRadius: 12,
+    padding: 24,
+    alignItems: "center",
+  },
+  rankingsLoadingText: {
+    fontSize: 14,
+    color: PALETTE.subtext,
+    marginTop: 8,
+  },
 
   // Empty state
   noRankingsContainer: {

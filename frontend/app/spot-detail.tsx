@@ -116,6 +116,7 @@ export default function SpotDetailPage() {
   const [showRankingPopup, setShowRankingPopup] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [comparisonSpots, setComparisonSpots] = useState<Spot[]>([]);
+  const [isLoadingComparisonSpots, setIsLoadingComparisonSpots] = useState(false);
   const [averageRanking, setAverageRanking] = useState<number>(0);
   const [rankingCount, setRankingCount] = useState<number>(0);
 
@@ -380,10 +381,12 @@ export default function SpotDetailPage() {
     const fetchUserRankedSpots = async () => {
       if (!spot) return;
 
+      setIsLoadingComparisonSpots(true);
       try {
         const currentUser = auth.currentUser;
         if (!currentUser) {
           setComparisonSpots([]);
+          setIsLoadingComparisonSpots(false);
           return;
         }
 
@@ -394,6 +397,7 @@ export default function SpotDetailPage() {
 
         if (userRankings.length === 0) {
           setComparisonSpots([]);
+          setIsLoadingComparisonSpots(false);
           return;
         }
 
@@ -402,6 +406,7 @@ export default function SpotDetailPage() {
 
         if (userRankingsList.length === 0) {
           setComparisonSpots([]);
+          setIsLoadingComparisonSpots(false);
           return;
         }
 
@@ -412,6 +417,7 @@ export default function SpotDetailPage() {
 
         if (rankedSpotIds.length === 0) {
           setComparisonSpots([]);
+          setIsLoadingComparisonSpots(false);
           return;
         }
 
@@ -464,9 +470,11 @@ export default function SpotDetailPage() {
         });
 
         setComparisonSpots(sortedSpots);
+        setIsLoadingComparisonSpots(false);
       } catch (error) {
         console.warn("Could not fetch user ranked spots:", error);
         setComparisonSpots([]);
+        setIsLoadingComparisonSpots(false);
       }
     };
 
@@ -702,6 +710,7 @@ export default function SpotDetailPage() {
         onSubmit={handleSubmitRanking}
         isSubmitting={isSubmitting}
         comparisonSpots={comparisonSpots}
+        isLoadingComparisonSpots={isLoadingComparisonSpots}
       />
     </SafeAreaView>
   );

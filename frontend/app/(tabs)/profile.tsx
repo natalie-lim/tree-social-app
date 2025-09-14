@@ -364,6 +364,7 @@ const styles = StyleSheet.create({
   notesWrap: { marginTop: 8 },
   notesLabel: { fontSize: 13, color: "#777", marginBottom: 2 },
   notesText: { fontSize: 15, fontStyle: "italic", color: "#333" },
+<<<<<<< HEAD
 
   loadingContainer: {
     flex: 1,
@@ -416,3 +417,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+=======
+});
+>>>>>>> origin/main

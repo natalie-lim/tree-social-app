@@ -7,7 +7,7 @@ const SAMPLE = [
   { name: "angie", points: 87 },
   { name: "luna", points: 41 },
   { name: "andrew", points: 0 },
-  { name: "kat", points: 0 },
+  { name: "kat", points: 41 },
   { name: "miles", points: 0 },
 ];
 
@@ -133,7 +133,7 @@ function RowCard({
 const styles = StyleSheet.create({
   screen: {
   flex: 1,
-  backgroundColor: COLORS.bg,
+  backgroundColor: "#FFFAF0",
   paddingHorizontal: 16,
   paddingTop: 60,
   },

@@ -1,8 +1,18 @@
 import { RankedCard, UserRanking } from "@/components/RankedCard";
 import { ThemedText } from "@/components/themed-text";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import {
+  router,
+  useFocusEffect,
+  useLocalSearchParams,
+  useNavigation,
+} from "expo-router";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -166,6 +176,15 @@ export default function MemberDetailScreen() {
     if (memberData) {
       try {
         const parsedMember = JSON.parse(memberData as string);
+        console.log("=== MEMBER DETAIL RECEIVED ===");
+        console.log("Parsed member data:", {
+          displayName: parsedMember.displayName,
+          followerCount: parsedMember.followerCount,
+          followingCount: parsedMember.followingCount,
+          totalRankings: parsedMember.totalRankings,
+          followers: parsedMember.followers,
+        });
+        console.log("==============================");
         setMember(parsedMember);
         setLoading(false);
       } catch (error) {
@@ -175,6 +194,52 @@ export default function MemberDetailScreen() {
       }
     }
   }, [memberData]);
+
+  // Function to refresh member data from Firebase
+  const refreshMemberData = useCallback(async () => {
+    if (!member?.userId) return;
+
+    try {
+      console.log("=== REFRESHING MEMBER DATA ===");
+      const freshMemberData = (await userService.getUserProfile(
+        member.userId
+      )) as any;
+      if (freshMemberData) {
+        console.log("Fresh data from Firebase:", {
+          followerCount: freshMemberData.followerCount,
+          followingCount: freshMemberData.followingCount,
+          totalRankings: freshMemberData.totalRankings,
+          followers: freshMemberData.followers,
+        });
+
+        // Update the member state with fresh data
+        setMember((prev) =>
+          prev
+            ? {
+                ...prev,
+                followerCount: freshMemberData.followerCount,
+                followingCount: freshMemberData.followingCount,
+                totalRankings: freshMemberData.totalRankings,
+                followers: freshMemberData.followers,
+                following: freshMemberData.following,
+              }
+            : null
+        );
+      }
+      console.log("=============================");
+    } catch (error) {
+      console.error("Error refreshing member data:", error);
+    }
+  }, [member?.userId]);
+
+  // Refresh member data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (member?.userId) {
+        refreshMemberData();
+      }
+    }, [member?.userId, refreshMemberData])
+  );
 
   // Check if current user is following this member
   useEffect(() => {
@@ -623,7 +688,7 @@ export default function MemberDetailScreen() {
           {/* Member's Rankings */}
           <View style={styles.rankingsSection}>
             <ThemedText style={styles.rankingsSectionTitle}>
-              {displayName}'s Recent Rankings
+              {displayName}'s recent rankings
             </ThemedText>
             {rankingsLoading ? (
               <View style={styles.rankingsLoadingContainer}>

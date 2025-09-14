@@ -1,6 +1,12 @@
 import { Spot as SpotCardType } from "@/components/SpotCard";
-import { router } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -100,6 +106,37 @@ export default function SearchScreen() {
       cancelled = true;
     };
   }, [debounced, tab]);
+
+  // Refresh search results when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (debounced && tab === "members") {
+        // Clear cache for member searches to get fresh follower counts
+        const cacheKey = `${tab}|${debounced}`;
+        delete cacheRef.current[cacheKey];
+
+        // Re-run the search to get fresh data
+        (async () => {
+          setLoading(true);
+          setError(null);
+          try {
+            console.log(
+              "Refreshing member search with currentUserId:",
+              user?.uid
+            );
+            const out = await searchFirestore(tab, debounced, user?.uid);
+            setResults(out);
+            cacheRef.current[cacheKey] = out;
+          } catch (e: any) {
+            setError(e?.message || "Search failed");
+            setResults([]);
+          } finally {
+            setLoading(false);
+          }
+        })();
+      }
+    }, [debounced, tab, user?.uid])
+  );
 
   // Add a recent when user taps a result
   const onSelectResult = (item: ResultItem) => {

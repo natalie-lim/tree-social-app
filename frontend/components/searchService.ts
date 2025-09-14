@@ -31,7 +31,7 @@ export type UserLite = {
   bio?: string;
   followerCount?: number;
   followingCount?: number;
-  followers?: string[]; // Array of user IDs
+  followers?: string[];
   totalRankings?: number;
 };
 
@@ -139,29 +139,12 @@ export async function searchFirestore(
       };
     });
   } else {
-    console.log("=== MEMBER SEARCH DEBUG ===");
-    console.log("Search query:", queryInput);
-    console.log("Normalized query:", normalize(queryInput));
-    console.log("Current user ID:", currentUserId);
-
     const ref = collection(db, "users");
     const normalizedQuery = normalize(queryInput); // Convert to lowercase for comparison
 
     // Get users and filter client-side to handle mixed case displayNames
     const queryRef = q(ref, qLimit(100)); // Get more users to filter from
     const snap = await getDocs(queryRef);
-
-    console.log("Total users fetched from Firestore:", snap.docs.length);
-
-    // Debug: Log raw Firestore data for first few users
-    console.log("=== RAW FIRESTORE DATA SAMPLE ===");
-    snap.docs.slice(0, 3).forEach((d, index) => {
-      console.log(
-        `User ${index + 1} (${d.id}):`,
-        JSON.stringify(d.data(), null, 2)
-      );
-    });
-    console.log("=================================");
 
     // Debug: Find the specific user we're looking for
     const targetUser = snap.docs.find((d) => {
@@ -213,7 +196,6 @@ export async function searchFirestore(
           ? `${u.followerCount} followers`
           : undefined;
 
-
       const memberData = {
         id: d.id,
         userId: u?.userId,
@@ -225,6 +207,22 @@ export async function searchFirestore(
         followers: u?.followers,
         totalRankings: u?.totalRankings,
       };
+
+      // Debug specific fields
+      if (
+        u?.displayName === queryInput ||
+        u?.displayName?.toLowerCase() === queryInput.toLowerCase()
+      ) {
+        console.log("=== TARGET USER FOUND IN SEARCH ===");
+        console.log("Raw Firebase data for", u?.displayName, ":", {
+          followerCount: u?.followerCount,
+          followingCount: u?.followingCount,
+          totalRankings: u?.totalRankings,
+          followers: u?.followers,
+        });
+        console.log("Member data object:", memberData);
+        console.log("===================================");
+      }
 
       console.log("Member Data Object:", JSON.stringify(memberData, null, 2));
 

@@ -37,22 +37,76 @@ interface UserProfile {
   totalRankings?: number;
 }
 
-
 const PALETTE = {
-  bg: "#F7F1E8",            // creamy background
+  bg: "#F7F1E8",
   card: "#FFFFFF",
   text: "#3E3E3E",
-  subtext: "#6F7B6F",       // leaf green-ish for secondary
-  accent: "#6FA076",        // leafy green
+  subtext: "#6F7B6F",
+  accent: "#6FA076",
   accentDark: "#5C8B64",
   divider: "#E6E0D6",
-  externalBg: "#F1EFE9",    // new: muted tan/gray for external likes/comments
+  externalBg: "#F1EFE9",
 };
 
-const AVATAR_URI =
-  "https://i.imgur.com/3GvwNBf.png"; // placeholder
+const AVATAR_URI = "https://i.imgur.com/3GvwNBf.png"; // (unused now, kept for reference)
 const PLACE_URI =
   "https://images.unsplash.com/photo-1505852679233-d9fd70aff56d?q=80&w=1200&auto=format&fit=crop";
+
+// -------- Letter Avatar --------
+const AVATAR_COLORS = [
+  "#6FA076", "#5C8B64", "#8BAF8F", "#7DA384", "#4E7F59", "#9DC3A4", "#678D73", "#5B9A7A",
+  "#7A9E7E", "#86B78A"
+];
+
+function colorForName(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash << 5) - hash + name.charCodeAt(i);
+    hash |= 0;
+  }
+  const idx = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[idx];
+}
+
+function firstLetter(name?: string) {
+  const trimmed = (name || "").trim();
+  if (!trimmed) return "?";
+  // Grab the first letter of the first word (supports names with emojis/whitespace)
+  const match = trimmed.match(/\p{L}|\p{N}/u);
+  return (match ? match[0] : trimmed[0]).toUpperCase();
+}
+
+const LetterAvatar = ({ name, size = 48 }: { name?: string; size?: number }) => {
+  const initial = firstLetter(name);
+  const bg = colorForName(name ?? "user");
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: bg,
+      }}
+      accessibilityRole="image"
+      accessibilityLabel={`${name ?? "user"} avatar`}
+    >
+      <Text
+        style={{
+          color: "white",
+          fontWeight: "800",
+          fontSize: Math.max(14, size * 0.44),
+          includeFontPadding: false,
+          textAlignVertical: "center",
+        }}
+      >
+        {initial}
+      </Text>
+    </View>
+  );
+};
+// --------------------------------
 
 const StatItem = ({ label, value }: Stat) => (
   <View style={styles.statItem}>
@@ -91,17 +145,13 @@ export default function Profile() {
 
     try {
       setProfileLoading(true);
-      
-      // Get all ranking IDs from user profile
       const rankingIds = profile.rankings.map(ranking => ranking.rankingId);
       const fullRankings: UserRanking[] = [];
 
-      // Fetch each ranking document individually (lightweight for display)
       for (const rankingId of rankingIds) {
         try {
           const rankingDoc = await firestoreService.read('rankings', rankingId);
           if (rankingDoc) {
-            // Create ranking with minimal data for display
             const ranking: UserRanking = {
               rankingId: rankingDoc.id || rankingId,
               spotId: (rankingDoc as any).spotId || '',
@@ -111,14 +161,12 @@ export default function Profile() {
               note: (rankingDoc as any).note || '',
               createdAt: (rankingDoc as any).createdAt,
               updatedAt: (rankingDoc as any).updatedAt,
-              // Don't fetch full spot data here - will be loaded on demand
               spotData: null
             };
             fullRankings.push(ranking);
           }
         } catch (err) {
           console.warn(`Could not fetch ranking ${rankingId}:`, err);
-          // If ranking document doesn't exist, create a fallback from user profile data
           const profileRanking = profile.rankings.find(r => r.rankingId === rankingId);
           if (profileRanking) {
             fullRankings.push({
@@ -136,14 +184,12 @@ export default function Profile() {
         }
       }
 
-      // Sort by most recent first (createdAt descending)
       const sortedRankings = fullRankings.sort((a, b) => {
         const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
         const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
         return dateB.getTime() - dateA.getTime();
       });
 
-      console.log('Fetched full user rankings:', sortedRankings);
       setUserRankings(sortedRankings);
     } catch (err) {
       console.error('Error fetching user rankings:', err);
@@ -152,7 +198,6 @@ export default function Profile() {
       setProfileLoading(false);
     }
   };
-
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -163,17 +208,10 @@ export default function Profile() {
 
       try {
         setProfileLoading(true);
-        
-        // First, update user stats from actual data
         await userService.updateUserStats(user.uid);
-        
-        // Then fetch the updated profile
         const profile = await userService.getUserProfile(user.uid);
-        console.log('Fetched user profile:', profile); // Debug log
         setUserProfile(profile as UserProfile);
         setError(null);
-
-        // Fetch full ranking documents
         await fetchUserRankings(profile as UserProfile);
       } catch (err) {
         console.error('Error fetching user profile:', err);
@@ -186,31 +224,20 @@ export default function Profile() {
     fetchUserProfile();
   }, [user]);
 
-  // Handle refresh trigger from tab press
   useEffect(() => {
     if (shouldRefreshProfile && user) {
-      console.log('Refreshing profile due to tab press');
       refreshProfile();
       clearRefreshFlag();
     }
   }, [shouldRefreshProfile, user]);
 
-  // Add refresh functionality
   const refreshProfile = async () => {
     if (!user) return;
-    
     try {
       setProfileLoading(true);
-      
-      // Update user stats from actual data
       await userService.updateUserStats(user.uid);
-      
-      // Then fetch the updated profile
       const profile = await userService.getUserProfile(user.uid);
-      console.log('Refreshed user profile:', profile); // Debug log
       setUserProfile(profile as UserProfile);
-
-      // Fetch full ranking documents
       await fetchUserRankings(profile as UserProfile);
     } catch (err) {
       console.error('Error refreshing profile:', err);
@@ -219,15 +246,10 @@ export default function Profile() {
     }
   };
 
-  // Function to fetch full spot data on demand
   const fetchSpotDataOnDemand = async (ranking: UserRanking) => {
-    if (ranking.spotData) {
-      // Already have spot data, navigate directly
-      return ranking.spotData;
-    }
+    if (ranking.spotData) return ranking.spotData;
 
     if (!ranking.spotId) {
-      // No spot ID, return fallback data
       return {
         id: ranking.spotId,
         name: ranking.spotName,
@@ -235,10 +257,7 @@ export default function Profile() {
         category: 'No category',
         location: { 
           address: ranking.spotLocation,
-          coordinates: {
-            latitude: 0,
-            longitude: 0
-          }
+          coordinates: { latitude: 0, longitude: 0 }
         },
         photos: [],
         amenities: [],
@@ -262,7 +281,6 @@ export default function Profile() {
     }
 
     try {
-      // Fetch full spot data
       const spotData = await firestoreService.read('spots', ranking.spotId);
       if (spotData) {
         return {
@@ -272,10 +290,7 @@ export default function Profile() {
           category: (spotData as any).category || 'No category',
           location: (spotData as any).location || { 
             address: ranking.spotLocation || 'Unknown Location',
-            coordinates: (spotData as any).location?.coordinates || {
-              latitude: 0,
-              longitude: 0
-            }
+            coordinates: (spotData as any).location?.coordinates || { latitude: 0, longitude: 0 }
           },
           photos: (spotData as any).photos || [],
           amenities: (spotData as any).amenities || [],
@@ -301,7 +316,6 @@ export default function Profile() {
       console.warn(`Could not fetch spot ${ranking.spotId}:`, err);
     }
 
-    // Fallback if spot data fetch fails
     return {
       id: ranking.spotId,
       name: ranking.spotName,
@@ -309,10 +323,7 @@ export default function Profile() {
       category: 'No category',
       location: { 
         address: ranking.spotLocation,
-        coordinates: {
-          latitude: 0,
-          longitude: 0
-        }
+        coordinates: { latitude: 0, longitude: 0 }
       },
       photos: [],
       amenities: [],
@@ -373,6 +384,8 @@ export default function Profile() {
     );
   }
 
+  const displayName = userProfile?.displayName || user?.displayName || "User";
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.root}>
@@ -383,19 +396,14 @@ export default function Profile() {
             <Text style={styles.brandName}>Leaflet</Text>
           </View>
 
-          {/* Avatar */}
+          {/* Avatar (Letter-based) */}
           <View style={styles.avatarWrap}>
-            <Image 
-              source={{ 
-                uri: userProfile?.profilePhoto || user?.photoURL || AVATAR_URI 
-              }} 
-              style={styles.avatar} 
-            />
+            <LetterAvatar name={displayName} size={124} />
           </View>
 
           {/* Handle + joined */}
           <View style={styles.centerWrap}>
-            <Text style={styles.handle}>@{userProfile?.displayName || user?.displayName || 'user'}</Text>
+            <Text style={styles.handle}>@{displayName}</Text>
             <Text style={styles.joined}>
               {userProfile?.joinedAt ? formatJoinDate(userProfile.joinedAt) : 'joined recently'}
             </Text>
@@ -421,7 +429,6 @@ export default function Profile() {
             <StatItem label="spots visited" value={userProfile?.totalSpots || 0} />
           </View>
 
-
           {/* Lists */}
           <View style={styles.section}>
             <ListRow 
@@ -429,12 +436,11 @@ export default function Profile() {
               label="Been" 
               value={userProfile?.totalRankings || 0} 
               onPress={() => {
-                // Navigate to rankings page
                 router.push({
                   pathname: '/user-rankings',
                   params: {
                     userId: user?.uid,
-                    userName: userProfile?.displayName || user?.displayName || 'User'
+                    userName: displayName
                   }
                 });
               }}
@@ -450,18 +456,15 @@ export default function Profile() {
             <ThemedText style={styles.rankingsSectionTitle}>Your Recent Rankings</ThemedText>
             {userRankings.length > 0 ? (
               <View style={styles.rankingsList}>
-                {userRankings.slice(0, 3).map((ranking, index) => (
+                {userRankings.slice(0, 3).map((ranking) => (
                   <RankedCard
                     key={ranking.rankingId}
                     ranking={ranking}
                     onPress={async (ranking) => {
-                      // Fetch full spot data on demand
                       const spotData = await fetchSpotDataOnDemand(ranking);
                       router.push({
                         pathname: '/spot-detail',
-                        params: {
-                          spotData: JSON.stringify(spotData)
-                        }
+                        params: { spotData: JSON.stringify(spotData) }
                       });
                     }}
                     style={styles.rankingCard}
@@ -492,6 +495,7 @@ const styles = StyleSheet.create({
   brandName: { fontSize: 25, fontWeight: "700", color: "#7DA384", letterSpacing: 0.3 },
 
   avatarWrap: { alignItems: "center", marginTop: 8 },
+  // avatar style kept for reference; LetterAvatar is inline-styled now
   avatar: { width: 124, height: 124, borderRadius: 62, backgroundColor: "#EEE" },
 
   centerWrap: { alignItems: "center", marginTop: 12 },
@@ -614,8 +618,7 @@ const styles = StyleSheet.create({
     color: PALETTE.subtext,
     textAlign: 'center',
   },
-  
-  // Rankings section
+
   rankingsSection: {
     marginTop: 20,
     marginHorizontal: 12,
@@ -630,7 +633,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rankingCard: {
-    marginBottom: 0, // Remove default margin since we're using gap
+    marginBottom: 0,
   },
   noRankingsContainer: {
     backgroundColor: PALETTE.card,
@@ -650,5 +653,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
-
 });

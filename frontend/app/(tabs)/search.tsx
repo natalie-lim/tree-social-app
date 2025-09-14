@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     backgroundColor: BG,
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 60,
+    paddingBottom: 20,
   },
 
   header: {
@@ -404,9 +404,9 @@ const styles = StyleSheet.create({
   },
 
   brandRow: {
-    paddingTop: 4,
-    paddingBottom: 6,
-    paddingRight: 16,
+    paddingTop: 20,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -421,7 +421,8 @@ const styles = StyleSheet.create({
 
   tabsRow: {
     flexDirection: "row",
-    marginTop: 12,
+    marginTop: 20,
+    paddingHorizontal: 20,
   },
   tab: {
     flex: 1,
@@ -447,7 +448,8 @@ const styles = StyleSheet.create({
   },
 
   overlaySearchWrap: {
-    marginTop: 12,
+    marginTop: 20,
+    marginHorizontal: 20,
     position: "relative",
   },
   overlayInput: {
@@ -461,7 +463,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  scrollArea: { flex: 1, marginTop: 14 },
+  scrollArea: { flex: 1, marginTop: 20, paddingHorizontal: 20 },
 
   sectionHeaderRow: {
     marginTop: 8,

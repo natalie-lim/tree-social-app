@@ -88,7 +88,8 @@ export default function Leaderboard() {
           const spots = Number(user?.totalSpots ?? 0) || 0;
           const reviews = Number(user?.totalReviews ?? 0) || 0;
           const avg = Number(user?.averageRating ?? 0) || 0;
-          const points = Number(user?.points ?? 0) || 0;
+          const totalRankings = Number(user?.totalRankings ?? 0) || 0;
+          const points = totalRankings * 5;
           return {
             id: String(user?.id ?? safeName),
             name: safeName,

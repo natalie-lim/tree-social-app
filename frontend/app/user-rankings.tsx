@@ -27,10 +27,6 @@ import { userService } from '../services/natureApp';
 
 
 export default function UserRankingsPage() {
-  const navigation = useNavigation();
-  useLayoutEffect(() => {
-    navigation.setOptions({ headerShown: false } as any);
-  }, [navigation]);
 
   const { userId, userName } = useLocalSearchParams();
   const [userRankings, setUserRankings] = useState<UserRanking[]>([]);

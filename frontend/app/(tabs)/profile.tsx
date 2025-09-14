@@ -33,6 +33,7 @@ interface UserProfile {
   totalSpots: number;
   totalReviews: number;
   averageRating: number;
+  averageRanking: number;
   rankings?: UserRanking[];
   totalRankings?: number;
 }
@@ -369,6 +370,7 @@ export default function Profile() {
             <ListRow icon="⭐" label="Reviews" value={userProfile?.totalReviews || 0} />
             <View style={styles.divider} />
             <ListRow icon="🏆" label="Average Rating" value={userProfile?.averageRating ? userProfile.averageRating.toFixed(1) : '0.0'} />
+            <ListRow icon="📊" label="Average Ranking" value={userProfile?.averageRanking ? userProfile.averageRanking.toFixed(1) : '0.0'} />
           </View>
 
           {/* User's Rankings */}

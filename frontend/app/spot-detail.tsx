@@ -3,6 +3,7 @@ import { Spot } from '@/components/SpotCard';
 import { ThemedText } from '@/components/themed-text';
 import { auth } from '@/config/firebase';
 import { firestoreService, rankingsService } from '@/services/firestore';
+import { userService } from '@/services/natureApp';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -272,6 +273,14 @@ export default function SpotDetailPage() {
       // Note: We don't update the spot's averageRating here because this is a personal ranking,
       // not a review. The spot's averageRating should only be updated when actual reviews are created.
       // Personal rankings are stored separately in the user's profile and rankings collection.
+
+      // Update user's average ranking
+      try {
+        await userService.updateUserStats(currentUser.uid);
+        console.log('Updated user average ranking');
+      } catch (updateError: any) {
+        console.warn('Could not update user average ranking:', updateError.message);
+      }
 
       // Update local state
       console.log('Setting user rating to:', rating);

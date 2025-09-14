@@ -86,15 +86,8 @@ export default function Bookmarks() {
     });
   };
 
-<<<<<<< HEAD
-  const onRefresh = () => {
-    fetchBookmarks(true);
-  };
-
-=======
   const onRefresh = () => fetchBookmarks(true);
   const handleBackPress = () => router.back();
->>>>>>> origin
 
   return (
     <SafeAreaView style={styles.container}>
@@ -110,8 +103,6 @@ export default function Bookmarks() {
           />
         }
       >
-<<<<<<< HEAD
-=======
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
@@ -120,7 +111,6 @@ export default function Bookmarks() {
           <Text style={styles.title}>Bookmarks</Text>
           <View style={styles.placeholder} />
         </View>
->>>>>>> origin
 
         {/* Content */}
         {loading ? (
@@ -161,27 +151,6 @@ export default function Bookmarks() {
 }
 
 const styles = StyleSheet.create({
-<<<<<<< HEAD
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  screen: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 40,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: COLORS.sub,
-  },
-=======
   container: { flex: 1, backgroundColor: COLORS.bg },
   screen: { flex: 1, paddingHorizontal: 16 },
   header: {
@@ -198,7 +167,6 @@ const styles = StyleSheet.create({
   loadingContainer: { justifyContent: "center", alignItems: "center", paddingVertical: 40 },
   loadingText: { marginTop: 12, fontSize: 16, color: COLORS.sub },
 
->>>>>>> origin
   errorContainer: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,

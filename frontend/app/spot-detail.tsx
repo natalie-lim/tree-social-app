@@ -3,8 +3,9 @@ import { ThemedText } from '@/components/themed-text';
 import { auth } from '@/config/firebase';
 import { rankingsService } from '@/services/firestore';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Dimensions,
   Image,
   Linking,
   Pressable,
@@ -15,38 +16,70 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // -----------------------------
-// Theme Tokens (keep in sync app-wide)
+// Theme Tokens (Beli-inspired design)
 // -----------------------------
+const { width: screenWidth } = Dimensions.get('window');
+
 const theme = {
   colors: {
-    bg: '#FFFAF0', // warm cream
-    surface: '#FFFAF0', // warm cream surface
-    overlay: 'rgba(0,0,0,0.55)',
-    border: '#E5E7EB',
-    subtext: '#6B7280',
-    muted: '#9CA3AF',
-    primary: '#6FA076',
-    primaryAlt: '#5B8963',
-    chipBg: '#FFF5E1',
-    chipText: '#5B4A32',
-    cardBg: '#FFF5E1',
-    verified: '#22C55E',
+    bg: '#F5F5DC', // beige background
+    surface: '#F5F5DC', // beige surface
+    overlay: 'rgba(0,0,0,0.4)',
+    border: '#D4C4A8',
+    subtext: '#8B7355',
+    muted: '#A68B5B',
+    primary: '#2D5016', // darker forest green
+    primaryAlt: '#1E3A0F',
+    secondary: '#228B22', // forest green
+    chipBg: '#E8F5E8',
+    chipText: '#2D5016',
+    cardBg: '#FFFFFF',
+    verified: '#228B22',
     difficulty: {
-      easy: '#22C55E',
-      moderate: '#F59E0B',
-      hard: '#EF4444',
-      varies: '#9E9E9E',
+      easy: '#228B22',
+      moderate: '#FFD700',
+      hard: '#FF6347',
+      varies: '#8B7355',
     },
-    text: '#3B2F2F', // dark cream-compatible
+    text: '#1E3A0F', // darker green
+    textSecondary: '#2D5016',
+    accent: '#2D5016',
+    success: '#228B22',
+    warning: '#FFD700',
+    error: '#FF6347',
   },
   radius: {
-    xs: 8,
-    sm: 10,
-    md: 16,
-    lg: 20,
-    xl: 24,
+    xs: 6,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 20,
+    xxl: 24,
   },
   spacing: (n: number) => 4 * n,
+  shadows: {
+    sm: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    md: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    lg: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+  },
 };
 
 // Small UI atoms
@@ -65,6 +98,9 @@ const StatCard = ({ label, value, tint }: { label: string; value: string; tint?:
 
 export default function SpotDetailPage() {
   const { spotData } = useLocalSearchParams();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRanked, setIsRanked] = useState(false);
+  const [userRating, setUserRating] = useState<number | null>(null);
 
   let spot: Spot | null = null;
   try {
@@ -210,28 +246,37 @@ export default function SpotDetailPage() {
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        {heroUrl ? (
-          <View style={styles.hero}>
+        <View style={styles.hero}>
+          {heroUrl ? (
             <Image source={{ uri: heroUrl }} style={styles.heroImage} resizeMode="cover" />
-            <View style={styles.heroOverlay} />
-            <View style={styles.heroContent}>
-              <View style={styles.titleRow}>
-                <ThemedText style={styles.title} numberOfLines={3}>
-                  {spot.name}
-                </ThemedText>
-                {spot.isVerified ? (
-                  <View style={styles.verified}>
-                    <ThemedText style={styles.verifiedMark}>✓</ThemedText>
-                  </View>
-                ) : null}
-              </View>
-              <View style={styles.categoryRow}>
-                <ThemedText style={styles.categoryIcon}>{getCategoryIcon(spot.category)}</ThemedText>
-                <ThemedText style={styles.categoryLabel}>{titleCased(spot.category).toUpperCase()}</ThemedText>
-              </View>
+          ) : (
+            <View style={styles.heroPlaceholder} />
+          )}
+          <View style={styles.heroOverlay} />
+          <View style={styles.heroContent}>
+            <View style={styles.titleRow}>
+              <ThemedText style={styles.title} numberOfLines={3}>
+                {spot.name}
+              </ThemedText>
+
+              {/* Ranking icon in the corner */}
+              <Pressable onPress={handleRankingPress} hitSlop={10}>
+                <View style={[styles.rankIcon, isRanked ? styles.rankIconChecked : styles.rankIconAdd]}>
+                  <ThemedText style={styles.rankIconText}>
+                    {isRanked ? `${userRating}★` : '+'}
+                  </ThemedText>
+                </View>
+              </Pressable>
+            </View>
+
+            <View style={styles.categoryRow}>
+              <ThemedText style={styles.categoryIcon}>{getCategoryIcon(spot.category)}</ThemedText>
+              <ThemedText style={styles.categoryLabel}>
+                {titleCased(spot.category).toUpperCase()}
+              </ThemedText>
             </View>
           </View>
-        ) : null}
+        </View>
 
         <View style={styles.surface}>
           {!!spot.description && (
@@ -266,7 +311,100 @@ export default function SpotDetailPage() {
             </View>
           </View>
 
-          {/* Other sections remain unchanged */}
+
+          {/* Stats Section */}
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>Details</ThemedText>
+            <View style={styles.statsGrid}>
+              {spot.difficulty && (
+                <StatCard 
+                  label="Difficulty" 
+                  value={titleCased(spot.difficulty)} 
+                  tint={getDifficultyTint(spot.difficulty)} 
+                />
+              )}
+              {spot.distance && (
+                <StatCard label="Distance" value={spot.distance} />
+              )}
+              {spot.duration && (
+                <StatCard label="Duration" value={spot.duration} />
+              )}
+              {spot.elevation && (
+                <StatCard label="Elevation" value={spot.elevation} />
+              )}
+            </View>
+          </View>
+
+          {/* Best Time to Visit */}
+          {spot.bestTimeToVisit && spot.bestTimeToVisit.length > 0 && (
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>Best Time to Visit</ThemedText>
+              <View style={styles.chipContainer}>
+                {spot.bestTimeToVisit.map((time, index) => (
+                  <Chip key={index} label={titleCased(time)} />
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Amenities */}
+          {amenityList.length > 0 && (
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>Amenities</ThemedText>
+              <View style={styles.chipContainer}>
+                {amenityList.map((amenity, index) => (
+                  <Chip key={index} label={amenity} />
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Tags */}
+          {tagList.length > 0 && (
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>Tags</ThemedText>
+              <View style={styles.chipContainer}>
+                {tagList.map((tag, index) => (
+                  <Chip key={index} label={tag} />
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Photo Gallery */}
+          {spot.photos && spot.photos.length > 1 && (
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>Photos</ThemedText>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={styles.galleryScroll}
+                contentContainerStyle={styles.galleryContainer}
+              >
+                {spot.photos.slice(1).map((photo, index) => (
+                  <View key={index} style={styles.galleryItem}>
+                    <Image source={{ uri: photo.url }} style={styles.galleryImage} resizeMode="cover" />
+                    {photo.caption && (
+                      <View style={styles.captionBox}>
+                        <ThemedText style={styles.captionText}>{photo.caption}</ThemedText>
+                        {photo.credit && (
+                          <ThemedText style={styles.creditText}>Photo: {photo.credit}</ThemedText>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* NPS Code */}
+          {spot.npsCode && (
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>National Park Service</ThemedText>
+              <ThemedText style={styles.npsCode}>NPS Code: {spot.npsCode}</ThemedText>
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -278,59 +416,297 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.bg,
   },
-  scroll: { flex: 1 },
+  scroll: { 
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: theme.spacing(4),
     paddingVertical: theme.spacing(3),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
     backgroundColor: theme.colors.bg,
+    ...theme.shadows.sm,
   },
-  backBtn: { paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(3) },
-  backBtnText: { fontSize: 16, fontWeight: '700', color: theme.colors.primary },
-  hero: { height: 260, position: 'relative' },
-  heroImage: { width: '100%', height: '100%' },
-  heroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: theme.colors.overlay },
-  heroContent: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: theme.spacing(5) },
-  titleRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: theme.spacing(2) },
-  title: { fontSize: 26, fontWeight: '800', color: theme.colors.text, flex: 1, marginRight: theme.spacing(3) },
-  verified: { width: 28, height: 28, borderRadius: 14, backgroundColor: theme.colors.verified, alignItems: 'center', justifyContent: 'center' },
-  verifiedMark: { color: '#FFF', fontSize: 16, fontWeight: '900' },
-  categoryRow: { flexDirection: 'row', alignItems: 'center' },
-  categoryIcon: { fontSize: 18, marginRight: theme.spacing(2), color: theme.colors.text },
-  categoryLabel: { fontSize: 12, color: theme.colors.text, fontWeight: '700', letterSpacing: 1 },
-  surface: { backgroundColor: theme.colors.surface, marginTop: -theme.spacing(5), borderTopLeftRadius: theme.radius.lg, borderTopRightRadius: theme.radius.lg, padding: theme.spacing(5) },
-  section: { marginBottom: theme.spacing(6) },
-  sectionTitle: { fontSize: 20, fontWeight: '800', color: theme.colors.text, marginBottom: theme.spacing(3) },
-  body: { fontSize: 16, lineHeight: 24, color: theme.colors.text },
-  rowCenter: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing(2) },
-  rowWrap: { flexDirection: 'row', flexWrap: 'wrap' },
-  pin: { fontSize: 16, marginRight: theme.spacing(2), color: theme.colors.text },
-  addr: { fontSize: 16, color: theme.colors.text, flex: 1 },
-  coords: { fontSize: 13, color: theme.colors.text, fontFamily: 'monospace', marginBottom: theme.spacing(2) },
-  primaryBtn: { backgroundColor: theme.colors.primary, paddingVertical: theme.spacing(3.5), paddingHorizontal: theme.spacing(4), borderRadius: theme.radius.md, alignItems: 'center' },
-  primaryBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
-  secondaryBtn: { backgroundColor: theme.colors.cardBg, paddingVertical: theme.spacing(2.5), paddingHorizontal: theme.spacing(3), borderRadius: theme.radius.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border, marginRight: theme.spacing(2), marginBottom: theme.spacing(2) },
-  secondaryBtnText: { color: theme.colors.text, fontSize: 14, fontWeight: '700' },
-  statGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  statCard: { minWidth: '46%', padding: theme.spacing(3), backgroundColor: theme.colors.cardBg, borderRadius: theme.radius.xs, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border, marginRight: theme.spacing(2), marginBottom: theme.spacing(2) },
-  statLabel: { fontSize: 12, fontWeight: '700', color: theme.colors.text, marginBottom: theme.spacing(1) },
-  statValue: { fontSize: 14, fontWeight: '800', color: theme.colors.text },
-  chip: { backgroundColor: theme.colors.chipBg, paddingHorizontal: theme.spacing(3), paddingVertical: theme.spacing(1.5), borderRadius: 999, marginRight: theme.spacing(2), marginBottom: theme.spacing(2) },
-  chipText: { fontSize: 14, color: theme.colors.chipText, fontWeight: '800' },
-  tag: { backgroundColor: theme.colors.cardBg, paddingHorizontal: theme.spacing(3), paddingVertical: theme.spacing(1.5), borderRadius: 999, marginRight: theme.spacing(2), marginBottom: theme.spacing(2) },
-  tagText: { fontSize: 14, color: theme.colors.text, fontWeight: '700' },
-  amenity: { backgroundColor: theme.colors.cardBg, paddingHorizontal: theme.spacing(3), paddingVertical: theme.spacing(2), borderRadius: theme.radius.xs, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border, marginRight: theme.spacing(2), marginBottom: theme.spacing(2) },
-  amenityText: { fontSize: 14, color: theme.colors.text, fontWeight: '700' },
-  galleryRow: { paddingRight: theme.spacing(5) },
-  cardPhoto: { width: 200, marginRight: theme.spacing(3) },
-  photo: { width: '100%', height: 150, borderRadius: theme.radius.xs },
-  captionBox: { padding: theme.spacing(2), backgroundColor: theme.colors.cardBg, borderRadius: theme.radius.xs, marginTop: theme.spacing(2) },
-  captionText: { fontSize: 12, color: theme.colors.text, marginBottom: theme.spacing(1) },
-  creditText: { fontSize: 11, color: theme.colors.text, fontStyle: 'italic' },
-  centerBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.spacing(6) },
-  errorTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.text, marginBottom: theme.spacing(1) },
-  errorSub: { fontSize: 14, color: theme.colors.text, textAlign: 'center' },
+  backBtn: { 
+    paddingVertical: theme.spacing(2), 
+    paddingHorizontal: theme.spacing(3),
+    borderRadius: theme.radius.sm,
+  },
+  backBtnText: { 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: theme.colors.primary 
+  },
+  hero: { 
+    height: 300, 
+    position: 'relative',
+    borderBottomLeftRadius: theme.radius.xl,
+    borderBottomRightRadius: theme.radius.xl,
+    overflow: 'hidden',
+  },
+  heroImage: { 
+    width: '100%', 
+    height: '100%' 
+  },
+  heroPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: theme.colors.primary,
+  },
+  heroOverlay: { 
+    ...StyleSheet.absoluteFillObject, 
+    backgroundColor: theme.colors.overlay 
+  },
+  heroContent: { 
+    position: 'absolute', 
+    left: 0, 
+    right: 0, 
+    bottom: 0, 
+    padding: theme.spacing(6),
+    paddingBottom: theme.spacing(8),
+  },
+  titleRow: { 
+    flexDirection: 'row', 
+    alignItems: 'flex-start', 
+    marginBottom: theme.spacing(3) 
+  },
+  title: { 
+    fontSize: 28, 
+    fontWeight: '800', 
+    color: '#FFFFFF', 
+    flex: 1, 
+    marginRight: theme.spacing(3),
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  verified: { 
+    width: 32, 
+    height: 32, 
+    borderRadius: 16, 
+    backgroundColor: theme.colors.verified, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    ...theme.shadows.sm,
+  },
+  verifiedMark: { 
+    color: '#FFF', 
+    fontSize: 18, 
+    fontWeight: '900' 
+  },
+  rankIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...theme.shadows.md,
+  },
+  rankIconAdd: {
+    backgroundColor: theme.colors.primary,
+  },
+  rankIconChecked: {
+    backgroundColor: theme.colors.success,
+  },
+  rankIconText: {
+    color: '#FFF',
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  categoryRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center' 
+  },
+  categoryIcon: { 
+    fontSize: 20, 
+    marginRight: theme.spacing(2), 
+    color: '#FFFFFF' 
+  },
+  categoryLabel: { 
+    fontSize: 14, 
+    color: '#FFFFFF', 
+    fontWeight: '700', 
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  surface: { 
+    backgroundColor: theme.colors.surface, 
+    marginTop: -theme.spacing(6), 
+    borderTopLeftRadius: theme.radius.xl, 
+    borderTopRightRadius: theme.radius.xl, 
+    padding: theme.spacing(6),
+    ...theme.shadows.lg,
+  },
+  section: { 
+    marginBottom: theme.spacing(8) 
+  },
+  sectionTitle: { 
+    fontSize: 22, 
+    fontWeight: '800', 
+    color: theme.colors.text, 
+    marginBottom: theme.spacing(4) 
+  },
+  body: { 
+    fontSize: 16, 
+    lineHeight: 26, 
+    color: theme.colors.textSecondary 
+  },
+  rowCenter: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: theme.spacing(3) 
+  },
+  rowWrap: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap' 
+  },
+  pin: { 
+    fontSize: 18, 
+    marginRight: theme.spacing(3), 
+    color: theme.colors.primary 
+  },
+  addr: { 
+    fontSize: 16, 
+    color: theme.colors.text, 
+    flex: 1,
+    fontWeight: '500',
+  },
+  coords: { 
+    fontSize: 13, 
+    color: theme.colors.textSecondary, 
+    fontFamily: 'monospace', 
+    marginBottom: theme.spacing(3),
+    backgroundColor: theme.colors.chipBg,
+    paddingHorizontal: theme.spacing(2),
+    paddingVertical: theme.spacing(1),
+    borderRadius: theme.radius.xs,
+    alignSelf: 'flex-start',
+  },
+  secondaryBtn: { 
+    backgroundColor: theme.colors.cardBg, 
+    paddingVertical: theme.spacing(3), 
+    paddingHorizontal: theme.spacing(4), 
+    borderRadius: theme.radius.md, 
+    borderWidth: 1, 
+    borderColor: theme.colors.border, 
+    marginRight: theme.spacing(3), 
+    marginBottom: theme.spacing(3),
+    ...theme.shadows.sm,
+  },
+  secondaryBtnText: { 
+    color: theme.colors.text, 
+    fontSize: 14, 
+    fontWeight: '600' 
+  },
+  statsGrid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap',
+    marginHorizontal: -theme.spacing(1),
+  },
+  statCard: { 
+    minWidth: '47%', 
+    padding: theme.spacing(4), 
+    backgroundColor: theme.colors.cardBg, 
+    borderRadius: theme.radius.lg, 
+    borderWidth: 1, 
+    borderColor: theme.colors.border, 
+    marginHorizontal: theme.spacing(1), 
+    marginBottom: theme.spacing(3),
+    ...theme.shadows.sm,
+  },
+  statLabel: { 
+    fontSize: 12, 
+    fontWeight: '600', 
+    color: theme.colors.textSecondary, 
+    marginBottom: theme.spacing(2),
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statValue: { 
+    fontSize: 16, 
+    fontWeight: '700', 
+    color: theme.colors.text 
+  },
+  chipContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -theme.spacing(1),
+  },
+  chip: { 
+    backgroundColor: theme.colors.chipBg, 
+    paddingHorizontal: theme.spacing(3), 
+    paddingVertical: theme.spacing(2), 
+    borderRadius: theme.radius.lg, 
+    marginHorizontal: theme.spacing(1), 
+    marginBottom: theme.spacing(2),
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  chipText: { 
+    fontSize: 14, 
+    color: theme.colors.chipText, 
+    fontWeight: '600' 
+  },
+  galleryScroll: {
+    marginHorizontal: -theme.spacing(6),
+  },
+  galleryContainer: {
+    paddingHorizontal: theme.spacing(6),
+  },
+  galleryItem: {
+    width: 200,
+    marginRight: theme.spacing(3),
+  },
+  galleryImage: { 
+    width: '100%', 
+    height: 150, 
+    borderRadius: theme.radius.lg 
+  },
+  captionBox: { 
+    padding: theme.spacing(3), 
+    backgroundColor: theme.colors.cardBg, 
+    borderRadius: theme.radius.md, 
+    marginTop: theme.spacing(2),
+    ...theme.shadows.sm,
+  },
+  captionText: { 
+    fontSize: 13, 
+    color: theme.colors.text, 
+    marginBottom: theme.spacing(1),
+    fontWeight: '500',
+  },
+  creditText: { 
+    fontSize: 11, 
+    color: theme.colors.textSecondary, 
+    fontStyle: 'italic' 
+  },
+  npsCode: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
+    backgroundColor: theme.colors.chipBg,
+    paddingHorizontal: theme.spacing(3),
+    paddingVertical: theme.spacing(2),
+    borderRadius: theme.radius.md,
+    alignSelf: 'flex-start',
+  },
+  centerBox: { 
+    flex: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    padding: theme.spacing(6) 
+  },
+  errorTitle: { 
+    fontSize: 20, 
+    fontWeight: '800', 
+    color: theme.colors.text, 
+    marginBottom: theme.spacing(2) 
+  },
+  errorSub: { 
+    fontSize: 16, 
+    color: theme.colors.textSecondary, 
+    textAlign: 'center' 
+  },
 });

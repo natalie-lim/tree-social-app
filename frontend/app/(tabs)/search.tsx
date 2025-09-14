@@ -1,7 +1,4 @@
 import { Spot as SpotCardType } from "@/components/SpotCard";
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -39,9 +36,7 @@ const BG = "#FFF6EC";
 
 export default function SearchScreen() {
   const [query, setQuery] = useState("");
-  const [overlayOpen, setOverlayOpen] = useState(false);
   const [tab, setTab] = useState<TabKey>("locations");
-  const [isFocused, setIsFocused] = useState(false);
 
   // Search state
   const [loading, setLoading] = useState(false);
@@ -60,21 +55,11 @@ export default function SearchScreen() {
     // runSearch();
   };
 
-  const handleFocus = () => {
-    setIsFocused(true);
-    setOverlayOpen(true);
-  };
-
-  const handleBlur = () => {
-    setIsFocused(false);
-  };
-
   // Normalize input for the index field ("*_lower")
   const normalized = useMemo(() => normalize(query), [query]);
   const debounced = useDebounced(normalized, 300);
 
   useEffect(() => {
-    if (!overlayOpen) return;
     if (!debounced) {
       setResults([]);
       setError(null);
@@ -111,11 +96,10 @@ export default function SearchScreen() {
     return () => {
       cancelled = true;
     };
-  }, [debounced, tab, overlayOpen]);
+  }, [debounced, tab]);
 
   // Add a recent when user taps a result
   const onSelectResult = (item: ResultItem) => {
-    setOverlayOpen(false);
     // naive recent push (dedupe by id)
     setRecents((prev) => {
       const next = [item, ...prev.filter((r) => r.id !== item.id)];
@@ -125,7 +109,6 @@ export default function SearchScreen() {
 
   // Navigate to spot detail page
   const handleSpotPress = (spot: SpotCardType) => {
-    setOverlayOpen(false);
     router.push({
       pathname: "/spot-detail",
       params: {
@@ -136,215 +119,147 @@ export default function SearchScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ThemedView style={styles.container}>
-        <ThemedText type="title" style={styles.header}>
-          Search
-        </ThemedText>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        {/* Brand row with close button */}
+        <View style={styles.brandRow}>
+          <Text style={styles.brandText}>leaflet</Text>
+          <Pressable
+            style={styles.closeFab}
+            onPress={() => router.push("/(tabs)/feed")}
+          >
+            <Text style={{ fontSize: 18, color: COLORS.text }}>×</Text>
+          </Pressable>
+        </View>
 
-        {/* Search bar styled like feed.tsx */}
-        <View style={styles.searchBarContainer}>
-          <View style={styles.searchWrap}>
-            <Ionicons name="search-outline" size={18} color={COLORS.sub} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-              placeholder="Search places, people, and content..."
-              placeholderTextColor={COLORS.sub}
-              style={styles.searchInput}
-              returnKeyType="search"
-              clearButtonMode="while-editing"
-              autoCorrect={false}
-              autoCapitalize="none"
+        {/* Tabs */}
+        <View style={styles.tabsRow}>
+          <Pressable style={styles.tab} onPress={() => setTab("locations")}>
+            <Text
+              style={[
+                styles.tabLabel,
+                tab === "locations" && styles.tabLabelActive,
+              ]}
+            >
+              Locations
+            </Text>
+            <View
+              style={[
+                styles.tabUnderline,
+                tab === "locations" && styles.tabUnderlineActive,
+              ]}
             />
-          </View>
+          </Pressable>
+
+          <Pressable style={styles.tab} onPress={() => setTab("members")}>
+            <Text
+              style={[
+                styles.tabLabel,
+                tab === "members" && styles.tabLabelActive,
+              ]}
+            >
+              Members
+            </Text>
+            <View
+              style={[
+                styles.tabUnderline,
+                tab === "members" && styles.tabUnderlineActive,
+              ]}
+            />
+          </Pressable>
         </View>
 
-        {/* Clean description */}
-        <View style={styles.descriptionContainer}>
-          <ThemedText style={styles.descriptionText}>
-            Find places, connect with people, and discover content from our
-            community.
-          </ThemedText>
-
-          {/* Subtle quick actions */}
-          <View style={styles.quickActionsContainer}>
-            <View style={styles.quickActionsRow}>
-              <Pressable
-                style={styles.quickActionPill}
-                onPress={() => setQuery("coffee")}
-              >
-                <ThemedText style={styles.quickActionText}>Coffee</ThemedText>
-              </Pressable>
-              <Pressable
-                style={styles.quickActionPill}
-                onPress={() => setQuery("hiking")}
-              >
-                <ThemedText style={styles.quickActionText}>Hiking</ThemedText>
-              </Pressable>
-              <Pressable
-                style={styles.quickActionPill}
-                onPress={() => setQuery("restaurants")}
-              >
-                <ThemedText style={styles.quickActionText}>Food</ThemedText>
-              </Pressable>
-            </View>
-          </View>
+        {/* Overlay search field */}
+        <View style={styles.overlaySearchWrap}>
+          <TextInput
+            autoFocus
+            value={query}
+            onChangeText={setQuery}
+            onSubmitEditing={handleSubmit}
+            placeholder={
+              tab === "locations"
+                ? "Search name or place…"
+                : "Search name or handle…"
+            }
+            placeholderTextColor={COLORS.sub}
+            style={styles.overlayInput}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
         </View>
 
-        {/* ================= FULL-SCREEN OVERLAY ================= */}
-        {overlayOpen && (
-          <View style={styles.overlay} pointerEvents="auto">
-            {/* Close (X) circle */}
-            <Pressable
-              style={styles.closeFab}
-              onPress={() => setOverlayOpen(false)}
-            >
-              <Text style={{ fontSize: 18, color: COLORS.text }}>×</Text>
-            </Pressable>
-
-            <KeyboardAvoidingView
-              style={{ flex: 1 }}
-              behavior={Platform.OS === "ios" ? "padding" : undefined}
-            >
-              {/* Brand row */}
-              <View style={styles.brandRow}>
-                <Text style={styles.brandText}>leaflet</Text>
+        {/* Content area */}
+        <ScrollView
+          style={styles.scrollArea}
+          contentContainerStyle={{ paddingBottom: 28 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* If no query, show Recents + Suggested */}
+          {!debounced ? (
+            <>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>Recents</Text>
               </View>
-
-              {/* Tabs */}
-              <View style={styles.tabsRow}>
-                <Pressable
-                  style={styles.tab}
-                  onPress={() => setTab("locations")}
-                >
-                  <Text
-                    style={[
-                      styles.tabLabel,
-                      tab === "locations" && styles.tabLabelActive,
-                    ]}
-                  >
-                    Locations
-                  </Text>
-                  <View
-                    style={[
-                      styles.tabUnderline,
-                      tab === "locations" && styles.tabUnderlineActive,
-                    ]}
-                  />
-                </Pressable>
-
-                <Pressable style={styles.tab} onPress={() => setTab("members")}>
-                  <Text
-                    style={[
-                      styles.tabLabel,
-                      tab === "members" && styles.tabLabelActive,
-                    ]}
-                  >
-                    Members
-                  </Text>
-                  <View
-                    style={[
-                      styles.tabUnderline,
-                      tab === "members" && styles.tabUnderlineActive,
-                    ]}
-                  />
-                </Pressable>
-              </View>
-
-              {/* Overlay search field */}
-              <View style={styles.overlaySearchWrap}>
-                <TextInput
-                  autoFocus
-                  value={query}
-                  onChangeText={setQuery}
-                  onSubmitEditing={handleSubmit}
-                  placeholder={
-                    tab === "locations"
-                      ? "Search name or place…"
-                      : "Search name or handle…"
-                  }
-                  placeholderTextColor={COLORS.sub}
-                  style={styles.overlayInput}
-                  returnKeyType="search"
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                />
-              </View>
-
-              {/* Content area */}
               <ScrollView
-                style={styles.scrollArea}
-                contentContainerStyle={{ paddingBottom: 28 }}
-                keyboardShouldPersistTaps="handled"
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingVertical: 8 }}
               >
-                {/* If no query, show Recents + Suggested */}
-                {!debounced ? (
-                  <>
-                    <View style={styles.sectionHeaderRow}>
-                      <Text style={styles.sectionTitle}>Recents</Text>
-                    </View>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ paddingVertical: 8 }}
-                    >
-                      {recents.map((r) => (
-                        <Pressable key={r.id} onPress={() => setQuery(r.title)}>
-                          <RecentPill
-                            name={r.title}
-                            handle={r.subtitle?.replace("@", "") || ""}
-                          />
-                        </Pressable>
-                      ))}
-                    </ScrollView>
-                  </>
-                ) : (
-                  <>
-                    <View style={styles.sectionHeaderRow}>
-                      <Text style={styles.sectionTitle}>
-                        {loading ? "Searching…" : error ? "Error" : "Results"}
-                      </Text>
-                      {!!debounced && (
-                        <Text style={{ color: COLORS.sub }}>{debounced}</Text>
-                      )}
-                    </View>
-
-                    {error ? (
-                      <Text style={{ color: "#B91C1C" }}>{error}</Text>
-                    ) : results.length === 0 && !loading ? (
-                      <Text style={{ color: COLORS.sub }}>No matches.</Text>
-                    ) : (
-                      results.map((r) => {
-                        if (tab === "locations" && r.spotData) {
-                          return (
-                            <ResultRow
-                              key={r.id}
-                              title={r.title}
-                              subtitle={r.subtitle}
-                              onPress={() => handleSpotPress(r.spotData!)}
-                            />
-                          );
-                        } else {
-                          return (
-                            <ResultRow
-                              key={r.id}
-                              title={r.title}
-                              subtitle={r.subtitle}
-                              onPress={onSelectResult}
-                            />
-                          );
-                        }
-                      })
-                    )}
-                  </>
-                )}
+                {recents.map((r) => (
+                  <Pressable key={r.id} onPress={() => setQuery(r.title)}>
+                    <RecentPill
+                      name={r.title}
+                      handle={r.subtitle?.replace("@", "") || ""}
+                    />
+                  </Pressable>
+                ))}
               </ScrollView>
-            </KeyboardAvoidingView>
-          </View>
-        )}
-      </ThemedView>
+            </>
+          ) : (
+            <>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>
+                  {loading ? "Searching…" : error ? "Error" : "Results"}
+                </Text>
+                {!!debounced && (
+                  <Text style={{ color: COLORS.sub }}>{debounced}</Text>
+                )}
+              </View>
+
+              {error ? (
+                <Text style={{ color: "#B91C1C" }}>{error}</Text>
+              ) : results.length === 0 && !loading ? (
+                <Text style={{ color: COLORS.sub }}>No matches.</Text>
+              ) : (
+                results.map((r) => {
+                  if (tab === "locations" && r.spotData) {
+                    return (
+                      <ResultRow
+                        key={r.id}
+                        title={r.title}
+                        subtitle={r.subtitle}
+                        onPress={() => handleSpotPress(r.spotData!)}
+                      />
+                    );
+                  } else {
+                    return (
+                      <ResultRow
+                        key={r.id}
+                        title={r.title}
+                        subtitle={r.subtitle}
+                        onPress={onSelectResult}
+                      />
+                    );
+                  }
+                })
+              )}
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -491,7 +406,10 @@ const styles = StyleSheet.create({
   brandRow: {
     paddingTop: 4,
     paddingBottom: 6,
-    paddingRight: 56,
+    paddingRight: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   brandText: {
     fontSize: 28,

@@ -73,10 +73,48 @@ export default function MemberDetailScreen() {
   const handleFollowPress = async () => {
     if (!user || !member) return;
 
+    // Update UI first for immediate feedback
+    const newFollowingState = !isFollowing;
+    setIsFollowing(newFollowingState);
+
+    // Update local state immediately
+    setMember((prev) =>
+      prev
+        ? {
+            ...prev,
+            followerCount: newFollowingState
+              ? (prev.followerCount || 0) + 1
+              : (prev.followerCount || 0) - 1,
+            followers: newFollowingState
+              ? [...(prev.followers || []), user.uid]
+              : (prev.followers || []).filter(
+                  (followerId: string) => followerId !== user.uid
+                ),
+          }
+        : null
+    );
+
+    // Then update backend
     try {
-      if (isFollowing) {
-        // Unfollow logic
-        // Decrement followerCount for the member
+      if (newFollowingState) {
+        // Follow logic - increment counts
+        await firestoreService.update("users", member.id, {
+          followerCount: (member.followerCount || 0) + 1,
+          followers: [...(member.followers || []), user.uid],
+        });
+
+        // Increment followingCount for current user
+        const currentUserDoc = (await userService.getUserProfile(
+          user.uid
+        )) as any;
+        if (currentUserDoc) {
+          await firestoreService.update("users", currentUserDoc.id, {
+            followingCount: (currentUserDoc.followingCount || 0) + 1,
+            following: [...(currentUserDoc.following || []), member.userId],
+          });
+        }
+      } else {
+        // Unfollow logic - decrement counts
         await firestoreService.update("users", member.id, {
           followerCount: (member.followerCount || 0) - 1,
           followers: (member.followers || []).filter(
@@ -96,53 +134,26 @@ export default function MemberDetailScreen() {
             ),
           });
         }
-
-        // Update local state
-        setMember((prev) =>
-          prev
-            ? {
-                ...prev,
-                followerCount: (prev.followerCount || 0) - 1,
-                followers: (prev.followers || []).filter(
-                  (followerId: string) => followerId !== user.uid
-                ),
-              }
-            : null
-        );
-      } else {
-        // Follow logic
-        // Increment followerCount for the member
-        await firestoreService.update("users", member.id, {
-          followerCount: (member.followerCount || 0) + 1,
-          followers: [...(member.followers || []), user.uid],
-        });
-
-        // Increment followingCount for current user
-        const currentUserDoc = (await userService.getUserProfile(
-          user.uid
-        )) as any;
-        if (currentUserDoc) {
-          await firestoreService.update("users", currentUserDoc.id, {
-            followingCount: (currentUserDoc.followingCount || 0) + 1,
-            following: [...(currentUserDoc.following || []), member.userId],
-          });
-        }
-
-        // Update local state
-        setMember((prev) =>
-          prev
-            ? {
-                ...prev,
-                followerCount: (prev.followerCount || 0) + 1,
-                followers: [...(prev.followers || []), user.uid],
-              }
-            : null
-        );
       }
-
-      setIsFollowing(!isFollowing);
     } catch (error) {
       console.error("Error updating follow status:", error);
+      // Revert UI changes if backend update fails
+      setIsFollowing(!newFollowingState);
+      setMember((prev) =>
+        prev
+          ? {
+              ...prev,
+              followerCount: newFollowingState
+                ? (prev.followerCount || 0) - 1
+                : (prev.followerCount || 0) + 1,
+              followers: newFollowingState
+                ? (prev.followers || []).filter(
+                    (followerId: string) => followerId !== user.uid
+                  )
+                : [...(prev.followers || []), user.uid],
+            }
+          : null
+      );
     }
   };
 

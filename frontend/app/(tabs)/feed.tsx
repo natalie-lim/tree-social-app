@@ -8,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -78,10 +77,8 @@ export default function Feed() {
               ...rankingDoc,
               id: rankingId,
             });
-          } 
-        } catch (err) {
-        
-        }
+          }
+        } catch (err) {}
       }
 
       // Step 4: Extract unique spotIds from rankings
@@ -120,8 +117,7 @@ export default function Feed() {
             try {
               userData = await firestoreService.read("users", userId);
               const userDataDebug = userData as any;
-            } catch (err) {
-            }
+            } catch (err) {}
 
             const userDataTyped = userData as any; // Type assertion to access user properties
             const finalUserName =
@@ -182,21 +178,13 @@ export default function Feed() {
       </View>
 
       {/* Search bar */}
-      <View style={styles.searchWrap}>
+      <TouchableOpacity
+        style={styles.searchWrap}
+        onPress={() => router.push("/(tabs)/search")}
+      >
         <Ionicons name="search-outline" size={18} color={COLORS.sub} />
-        <TextInput
-          placeholder="Search a place, member, etc."
-          placeholderTextColor={COLORS.sub}
-          style={styles.searchInput}
-          onSubmitEditing={(e) =>
-            router.push({
-              pathname: "/(tabs)/search",
-              params: { q: e.nativeEvent.text },
-            })
-          }
-          returnKeyType="search"
-        />
-      </View>
+        <Text style={styles.searchInput}>Search a place, member, etc.</Text>
+      </TouchableOpacity>
 
       {/* Pills row */}
       <View style={styles.pillsRow}>
@@ -306,7 +294,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     fontSize: 16,
-    color: COLORS.text,
+    color: COLORS.sub,
   },
 
   pillsRow: {

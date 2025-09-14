@@ -247,6 +247,7 @@ export default function Feed() {
             spot={spot}
             onPress={handleSpotPress}
             style={styles.spotCard}
+            rankingUserId={spot.rankingUser?.userId}
             userName={spot.rankingUser?.userName}
             userDisplayName={spot.rankingUser?.userDisplayName}
             userNotes={spot.rankingUser?.userNotes}

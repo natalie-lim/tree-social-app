@@ -1,5 +1,7 @@
-import React from "react";
+import { collection, getDocs, limit, query, where } from "firebase/firestore";
+import React, { useEffect, useState } from "react";
 import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import { db } from "../config/firebase";
 import { ThemedText } from "./themed-text";
 
 // Types based on the document structure
@@ -47,6 +49,7 @@ interface SpotCardProps {
   spot: Spot;
   onPress?: (spot: Spot) => void;
   style?: any;
+  rankingUserId?: string;
   userName?: string;
   userDisplayName?: string;
   userNotes?: string;
@@ -58,11 +61,53 @@ export function SpotCard({
   spot,
   onPress,
   style,
+  rankingUserId,
   userName,
   userDisplayName,
   userNotes,
 }: SpotCardProps) {
-  const accentColor = "#6FA076"; // Your app's accent color
+  const [resolvedName, setResolvedName] = useState<string | undefined>(
+    userDisplayName
+  );
+
+  useEffect(() => {
+    let alive = true;
+
+    async function loadDisplayName() {
+  
+      // 1) Preferred: lookup by userId field in users collection
+      if (rankingUserId) {
+        try {
+          const qRef = query(
+            collection(db, "users"),
+            where("userId", "==", rankingUserId),
+            limit(1)
+          );
+
+          const qs = await getDocs(qRef);
+          if (!alive) return;
+          if (!qs.empty) {
+            const u = qs.docs[0].data() as any;
+            setResolvedName(
+              u.displayName || u.name || u.username || userName || "User"
+            );
+            return;
+          }
+        } catch (e) {
+          // swallow/log if you want
+        }
+      }
+      // 3) Last resort
+      setResolvedName(userName || "User");
+    }
+
+    loadDisplayName();
+    return () => {
+      alive = false;
+    };
+  }, [rankingUserId, userDisplayName, userName]);
+
+  const accentColor = "#6FA076";
 
   return (
     <Pressable style={[styles.card, style]} onPress={() => onPress?.(spot)}>
@@ -90,11 +135,11 @@ export function SpotCard({
         </View>
 
         {/* User Section */}
-        {(userName || userDisplayName) && (
+        {resolvedName && (
           <View style={styles.userSection}>
             <Text style={styles.userIcon}>👤</Text>
             <ThemedText style={styles.userText}>
-              {userDisplayName || userName || "User"}'s ranking
+              {resolvedName}'s ranking
             </ThemedText>
           </View>
         )}

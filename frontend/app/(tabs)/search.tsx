@@ -120,6 +120,16 @@ export default function SearchScreen() {
     });
   };
 
+  // Navigate to member detail page
+  const handleMemberPress = (memberData: any) => {
+    router.push({
+      pathname: "/member-detail",
+      params: {
+        memberData: JSON.stringify(memberData),
+      },
+    });
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -253,7 +263,7 @@ export default function SearchScreen() {
                         key={r.id}
                         title={r.title}
                         subtitle={r.subtitle}
-                        onPress={onSelectResult}
+                        onPress={() => handleMemberPress(r.memberData)}
                       />
                     );
                   }

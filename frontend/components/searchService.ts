@@ -28,8 +28,11 @@ export type UserLite = {
   handle?: string;
   username_lower?: string;
   displayName?: string;
-  rank?: number;
-  followers?: number;
+  bio?: string;
+  followerCount?: number;
+  followingCount?: number;
+  followers?: string[]; // Array of user IDs
+  totalRankings?: number;
 };
 
 export type ResultItem = {
@@ -37,6 +40,7 @@ export type ResultItem = {
   title: string;
   subtitle?: string;
   spotData?: SpotCardType;
+  memberData?: UserLite;
 };
 
 // Utility function to convert string to title case
@@ -135,12 +139,29 @@ export async function searchFirestore(
       };
     });
   } else {
+    console.log("=== MEMBER SEARCH DEBUG ===");
+    console.log("Search query:", queryInput);
+    console.log("Normalized query:", normalize(queryInput));
+    console.log("Current user ID:", currentUserId);
+
     const ref = collection(db, "users");
     const normalizedQuery = normalize(queryInput); // Convert to lowercase for comparison
 
     // Get users and filter client-side to handle mixed case displayNames
     const queryRef = q(ref, qLimit(100)); // Get more users to filter from
     const snap = await getDocs(queryRef);
+
+    console.log("Total users fetched from Firestore:", snap.docs.length);
+
+    // Debug: Log raw Firestore data for first few users
+    console.log("=== RAW FIRESTORE DATA SAMPLE ===");
+    snap.docs.slice(0, 3).forEach((d, index) => {
+      console.log(
+        `User ${index + 1} (${d.id}):`,
+        JSON.stringify(d.data(), null, 2)
+      );
+    });
+    console.log("=================================");
 
     // Filter users where displayName starts with the normalized query (case-insensitive)
     // and exclude the current user if provided
@@ -168,13 +189,44 @@ export async function searchFirestore(
       const subtitle =
         u?.displayName && u?.handle
           ? `${u.displayName}`
-          : u?.followers || u?.rank
-          ? `Rank #${u.rank ?? "-"} • ${u.followers ?? 0} followers`
+          : u?.followerCount
+          ? `${u.followerCount} followers`
           : undefined;
+
+      // Debug logging for all user data
+      console.log("=== USER DATA DEBUG ===");
+      console.log("Document ID:", d.id);
+      console.log("User ID (auth):", u?.userId);
+      console.log("Display Name:", u?.displayName);
+      console.log("Handle:", u?.handle);
+      console.log("Bio:", u?.bio);
+      console.log("Follower Count:", u?.followerCount);
+      console.log("Following Count:", u?.followingCount);
+      console.log("Followers Array:", u?.followers);
+      console.log("Total Rankings:", u?.totalRankings);
+      console.log("Title:", title);
+      console.log("Subtitle:", subtitle);
+      console.log("========================");
+
+      const memberData = {
+        id: d.id,
+        userId: u?.userId,
+        handle: u?.handle,
+        displayName: u?.displayName,
+        bio: u?.bio,
+        followerCount: u?.followerCount,
+        followingCount: u?.followingCount,
+        followers: u?.followers,
+        totalRankings: u?.totalRankings,
+      };
+
+      console.log("Member Data Object:", JSON.stringify(memberData, null, 2));
+
       return {
         id: d.id || `user_${Date.now()}_${Math.random()}`,
         title,
         subtitle,
+        memberData,
       };
     });
   }

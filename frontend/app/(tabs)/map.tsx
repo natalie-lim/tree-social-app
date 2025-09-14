@@ -168,7 +168,9 @@ export default function MapScreen() {
         </View>
       ) : (
         <MapView
-          ref={(r) => (mapRef.current = r)}
+          ref={(r) => {
+            mapRef.current = r;
+          }}
           style={{ flex: 1 }}
           provider={PROVIDER_GOOGLE} 
           customMapStyle={COLORFUL_MAP_STYLE}
@@ -216,10 +218,20 @@ const styles = StyleSheet.create({
 export const COLORFUL_MAP_STYLE = [
   { featureType: "landscape", stylers: [{ color: "#FFF6EC" }] },
   { featureType: "water", stylers: [{ color: "#A4DDED" }] },
-  { featureType: "poi.park", stylers: [{ color: "#CDEBC0" }, { visibility: "on" }] },
+  {
+    featureType: "poi.park",
+    stylers: [{ color: "#CDEBC0" }, { visibility: "on" }],
+  },
   { featureType: "landscape.natural", stylers: [{ color: "#E5F5D7" }] },
-  { featureType: "road.highway", stylers: [{ color: "#F7C59F" }, { visibility: "on" }] },
-  { featureType: "road.highway", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  {
+    featureType: "road.highway",
+    stylers: [{ color: "#F7C59F" }, { visibility: "on" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "labels.icon",
+    stylers: [{ visibility: "off" }],
+  },
   { featureType: "road.arterial", stylers: [{ visibility: "off" }] },
   { featureType: "road.local", stylers: [{ visibility: "off" }] },
   {
@@ -227,7 +239,10 @@ export const COLORFUL_MAP_STYLE = [
     elementType: "labels.text.fill",
     stylers: [{ color: "#2F4A43" }, { visibility: "on" }],
   },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 2 }] },
+  {
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#ffffff" }, { weight: 2 }],
+  },
   { featureType: "poi", stylers: [{ visibility: "off" }] },
   { featureType: "transit", stylers: [{ visibility: "off" }] },
 ];

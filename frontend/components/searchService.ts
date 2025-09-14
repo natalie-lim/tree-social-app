@@ -24,11 +24,15 @@ export type Spot = {
 
 export type UserLite = {
   id: string;
+  userId?: string; // Auth UID stored in the document
   handle?: string;
   username_lower?: string;
   displayName?: string;
-  rank?: number;
-  followers?: number;
+  bio?: string;
+  followerCount?: number;
+  followingCount?: number;
+  followers?: string[];
+  totalRankings?: number;
 };
 
 export type ResultItem = {
@@ -36,6 +40,7 @@ export type ResultItem = {
   title: string;
   subtitle?: string;
   spotData?: SpotCardType;
+  memberData?: UserLite;
 };
 
 // Utility function to convert string to title case
@@ -99,7 +104,8 @@ export function buildLocationSubtitle(s: SpotCardType): string | undefined {
  */
 export async function searchFirestore(
   tab: TabKey,
-  queryInput: string
+  queryInput: string,
+  currentUserId?: string
 ): Promise<ResultItem[]> {
   if (!queryInput) return [];
 
@@ -140,13 +146,42 @@ export async function searchFirestore(
     const queryRef = q(ref, qLimit(100)); // Get more users to filter from
     const snap = await getDocs(queryRef);
 
+    // Debug: Find the specific user we're looking for
+    const targetUser = snap.docs.find((d) => {
+      const u = d.data() as UserLite;
+      return (
+        u?.displayName === queryInput ||
+        u?.displayName?.toLowerCase() === queryInput.toLowerCase()
+      );
+    });
+
+    if (targetUser) {
+      console.log("=== TARGET USER FOUND ===");
+      console.log(
+        "Target user data:",
+        JSON.stringify(targetUser.data(), null, 2)
+      );
+      console.log("=========================");
+    } else {
+      console.log("Target user not found in fetched data");
+    }
+
     // Filter users where displayName starts with the normalized query (case-insensitive)
+    // and exclude the current user if provided
     const filteredUsers = snap.docs
       .filter((d) => {
         const u = d.data() as UserLite;
         const displayName = u?.displayName || "";
         const normalizedDisplayName = normalize(displayName);
-        return normalizedDisplayName.startsWith(normalizedQuery);
+        const matchesQuery = normalizedDisplayName.startsWith(normalizedQuery);
+        const isNotCurrentUser = !currentUserId || u?.userId !== currentUserId;
+
+        // Debug logging
+        console.log(
+          `User ${d.id}: displayName="${displayName}", userId="${u?.userId}", matchesQuery=${matchesQuery}, isNotCurrentUser=${isNotCurrentUser}, currentUserId="${currentUserId}"`
+        );
+
+        return matchesQuery && isNotCurrentUser;
       })
       .slice(0, 20); // Limit to 20 results
 
@@ -157,13 +192,45 @@ export async function searchFirestore(
       const subtitle =
         u?.displayName && u?.handle
           ? `${u.displayName}`
-          : u?.followers || u?.rank
-          ? `Rank #${u.rank ?? "-"} • ${u.followers ?? 0} followers`
+          : u?.followerCount
+          ? `${u.followerCount} followers`
           : undefined;
+
+      const memberData = {
+        id: d.id,
+        userId: u?.userId,
+        handle: u?.handle,
+        displayName: u?.displayName,
+        bio: u?.bio,
+        followerCount: u?.followerCount,
+        followingCount: u?.followingCount,
+        followers: u?.followers,
+        totalRankings: u?.totalRankings,
+      };
+
+      // Debug specific fields
+      if (
+        u?.displayName === queryInput ||
+        u?.displayName?.toLowerCase() === queryInput.toLowerCase()
+      ) {
+        console.log("=== TARGET USER FOUND IN SEARCH ===");
+        console.log("Raw Firebase data for", u?.displayName, ":", {
+          followerCount: u?.followerCount,
+          followingCount: u?.followingCount,
+          totalRankings: u?.totalRankings,
+          followers: u?.followers,
+        });
+        console.log("Member data object:", memberData);
+        console.log("===================================");
+      }
+
+      console.log("Member Data Object:", JSON.stringify(memberData, null, 2));
+
       return {
         id: d.id || `user_${Date.now()}_${Math.random()}`,
         title,
         subtitle,
+        memberData,
       };
     });
   }

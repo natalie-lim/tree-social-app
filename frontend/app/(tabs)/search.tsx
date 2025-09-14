@@ -1,6 +1,12 @@
 import { Spot as SpotCardType } from "@/components/SpotCard";
-import { router } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,6 +18,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useAuth } from "../../contexts/AuthContext";
 
 // Import search service
 import {
@@ -35,6 +42,7 @@ const COLORS = {
 const BG = "#FFF6EC";
 
 export default function SearchScreen() {
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<TabKey>("locations");
 
@@ -80,7 +88,8 @@ export default function SearchScreen() {
       setLoading(true);
       setError(null);
       try {
-        const out = await searchFirestore(tab, debounced);
+        console.log("Searching with currentUserId:", user?.uid);
+        const out = await searchFirestore(tab, debounced, user?.uid);
         if (cancelled) return;
         setResults(out);
         cacheRef.current[cacheKey] = out;
@@ -98,6 +107,37 @@ export default function SearchScreen() {
     };
   }, [debounced, tab]);
 
+  // Refresh search results when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (debounced && tab === "members") {
+        // Clear cache for member searches to get fresh follower counts
+        const cacheKey = `${tab}|${debounced}`;
+        delete cacheRef.current[cacheKey];
+
+        // Re-run the search to get fresh data
+        (async () => {
+          setLoading(true);
+          setError(null);
+          try {
+            console.log(
+              "Refreshing member search with currentUserId:",
+              user?.uid
+            );
+            const out = await searchFirestore(tab, debounced, user?.uid);
+            setResults(out);
+            cacheRef.current[cacheKey] = out;
+          } catch (e: any) {
+            setError(e?.message || "Search failed");
+            setResults([]);
+          } finally {
+            setLoading(false);
+          }
+        })();
+      }
+    }, [debounced, tab, user?.uid])
+  );
+
   // Add a recent when user taps a result
   const onSelectResult = (item: ResultItem) => {
     // naive recent push (dedupe by id)
@@ -113,6 +153,16 @@ export default function SearchScreen() {
       pathname: "/spot-detail",
       params: {
         spotData: JSON.stringify(spot),
+      },
+    });
+  };
+
+  // Navigate to member detail page
+  const handleMemberPress = (memberData: any) => {
+    router.push({
+      pathname: "/member-detail",
+      params: {
+        memberData: JSON.stringify(memberData),
       },
     });
   };
@@ -250,7 +300,7 @@ export default function SearchScreen() {
                         key={r.id}
                         title={r.title}
                         subtitle={r.subtitle}
-                        onPress={onSelectResult}
+                        onPress={() => handleMemberPress(r.memberData)}
                       />
                     );
                   }

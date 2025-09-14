@@ -185,7 +185,7 @@ export default function Profile() {
         return dateB.getTime() - dateA.getTime();
       });
 
-      console.log('Fetched full user rankings:', sortedRankings);
+      console.log('Fetched full user rankings');
       setUserRankings(sortedRankings);
     } catch (err) {
       console.error('Error fetching user rankings:', err);

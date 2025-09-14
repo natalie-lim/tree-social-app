@@ -214,13 +214,9 @@ export default function SpotDetailPage() {
   }, [spot]);
 
   const handleRankingPress = () => {
-    if (isRanked) {
-      // Already ranked - could show rating details or allow editing
-      console.log('Spot already ranked with rating:', userRating);
-    } else {
-      // Show ranking popup
-      setShowRankingPopup(true);
-    }
+    // Always show ranking popup - allows both new rankings and editing existing ones
+    console.log('Ranking button pressed, current state:', { isRanked, showRankingPopup, userRating });
+    setShowRankingPopup(true);
   };
 
   const handleSubmitRanking = async (rating: number, note: string, rankedList: Spot[]) => {

@@ -49,6 +49,7 @@ interface SpotCardProps {
   style?: any;
   userName?: string;
   userDisplayName?: string;
+  userNotes?: string;
 }
 
 const { width } = Dimensions.get("window");
@@ -59,6 +60,7 @@ export function SpotCard({
   style,
   userName,
   userDisplayName,
+  userNotes,
 }: SpotCardProps) {
   const accentColor = "#6FA076"; // Your app's accent color
 
@@ -101,7 +103,7 @@ export function SpotCard({
         <View style={styles.notesSection}>
           <ThemedText style={styles.notesLabel}>Your Notes:</ThemedText>
           <ThemedText style={styles.notesText}>
-            {spot.description || "No notes added yet"}
+            {userNotes || spot.description || "No notes added yet"}
           </ThemedText>
         </View>
 

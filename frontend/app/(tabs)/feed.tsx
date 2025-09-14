@@ -41,10 +41,9 @@ export default function Feed() {
 
       // Step 1: Get all users
       const users = await firestoreService.getAll("users");
-      console.log("Fetched users:", users.length);
 
-      // Step 2: Get all rankings from users (rankings is an array field in each user document)
-      const allRankings = [];
+      // Step 2: Get all rankingIds from users and fetch full ranking documents
+      const allRankingIds = [];
       for (const user of users) {
         try {
           // Access rankings array directly from user document
@@ -53,31 +52,12 @@ export default function Feed() {
             userWithRankings.rankings &&
             Array.isArray(userWithRankings.rankings)
           ) {
-            console.log(
-              `User ${user.id} has ${userWithRankings.rankings.length} rankings:`,
-              userWithRankings.rankings
-            );
-            // Add user info to each ranking
-            const rankingsWithUser = userWithRankings.rankings.map(
-              (ranking: any) => ({
-                ...ranking,
-                userId: user.id,
-                userName:
-                  userWithRankings.displayName ||
-                  userWithRankings.email ||
-                  "User",
-                userDisplayName:
-                  userWithRankings.displayName ||
-                  userWithRankings.email ||
-                  "User",
-              })
-            );
-            allRankings.push(...rankingsWithUser);
-          } else {
-            console.log(
-              `User ${user.id} has no rankings or rankings is not an array`
-            );
-          }
+            // Extract rankingIds from user's rankings array
+            const userRankingIds = userWithRankings.rankings
+              .map((ranking: any) => ranking.rankingId)
+              .filter(Boolean);
+            allRankingIds.push(...userRankingIds);
+          } 
         } catch (err) {
           console.log(
             `Error accessing rankings for user ${user.id}:`,
@@ -85,45 +65,65 @@ export default function Feed() {
           );
         }
       }
-      console.log("Total rankings found:", allRankings.length);
 
-      // Step 3: Extract unique spotIds from rankings
-      console.log("Sample ranking structure:", allRankings[0]); // Debug: see the actual structure
+      // Step 3: Fetch full ranking documents from rankings collection
+      const allRankings = [];
+      for (const rankingId of allRankingIds) {
+        try {
+          const rankingDoc = await firestoreService.read("rankings", rankingId);
+          if (rankingDoc) {
+            allRankings.push({
+              ...rankingDoc,
+              id: rankingId,
+            });
+          } else {
+            console.log(`Ranking document ${rankingId} not found`);
+          }
+        } catch (err) {
+          console.log(
+            `Error fetching ranking ${rankingId}:`,
+            err instanceof Error ? err.message : String(err)
+          );
+        }
+      }
+
+      // Step 4: Extract unique spotIds from rankings
       const spotIds = [
         ...new Set(
           allRankings
             .map((ranking: any) => {
-              // Try different possible nested structures for spotId
-              const spotId =
-                ranking.spotId ||
-                ranking.data?.spotId ||
-                ranking.spot?.id ||
-                ranking.spotId ||
-                ranking.spotId;
-              console.log(`Extracted spotId from ranking:`, spotId); // Debug: see what we extracted
+              // Extract spotId from ranking document
+              const spotId = ranking.spotId;
               return spotId;
             })
             .filter(Boolean)
         ),
       ];
 
-      // Step 4: Get all spots and match by name
+      // Step 5: Get all spots and match by name
       const allSpots = await firestoreService.getAll("spots");
 
-      // Step 5: Create spots with user information
+      // Step 6: Create spots with user information from rankings collection
       const spotsWithUsers = [];
       for (const ranking of allRankings) {
-        const spotId =
-          ranking.spotId || ranking.data?.spotId || ranking.spot?.id;
+        const rankingData = ranking as any; // Type assertion to access ranking properties
+        const spotId = rankingData.spotId;
         if (spotId) {
           const matchingSpot = allSpots.find((spot) => spot.id === spotId);
           if (matchingSpot) {
             spotsWithUsers.push({
               ...matchingSpot,
               rankingUser: {
-                userId: ranking.userId,
-                userName: ranking.userName,
-                userDisplayName: ranking.userDisplayName,
+                userId: rankingData.createdBy || rankingData.userId,
+                userName: rankingData.userName || rankingData.createdBy,
+                userDisplayName:
+                  rankingData.userDisplayName ||
+                  rankingData.userName ||
+                  rankingData.createdBy,
+                userNotes:
+                  rankingData.note ||
+                  rankingData.notes ||
+                  rankingData.description,
               },
             });
           }
@@ -230,6 +230,7 @@ export default function Feed() {
             style={styles.spotCard}
             userName={spot.rankingUser?.userName}
             userDisplayName={spot.rankingUser?.userDisplayName}
+            userNotes={spot.rankingUser?.userNotes}
           />
         ))
       )}

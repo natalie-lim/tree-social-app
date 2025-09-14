@@ -1,7 +1,7 @@
 // app/(tabs)/feed.tsx
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 const COLORS = {
   bg: "#FFF6EC",     // soft cream
@@ -41,7 +41,7 @@ export default function Feed() {
 
       {/* Pills row */}
       <View style={styles.pillsRow}>
-        <Pill icon="calendar-outline" label="Add Place" onPress={() => { /* route */ }} />
+        <Pill icon="calendar-outline" label="Add Place" onPress={() => router.push('/add-place')} />
         <Pill icon="navigate-outline" label="Open Map" onPress={() => router.push("/map")} />
       </View>
 

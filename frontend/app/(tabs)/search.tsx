@@ -1,6 +1,7 @@
 import { Spot as SpotCardType } from "@/components/SpotCard";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -25,13 +26,16 @@ import {
 } from "../../components/searchService";
 
 const COLORS = {
-  text: "#111827",
-  subtext: "#6B7280",
-  border: "#D1D5DB",
-  bg: "#FFFFFF",
-  accent: "#6FA076",
+  bg: "#FFF6EC", // soft cream
+  brand: "#2F4A43", // deep green (logo / active)
+  chip: "#1F5B4E", // dark teal for buttons
+  chipText: "#FFFFFF",
+  text: "#222326",
+  sub: "#6F7276",
+  inputBg: "#F2F4F5",
+  border: "#E3E6E8",
 };
-const BG = "#FFFAF0";
+const BG = "#FFF6EC";
 
 export default function SearchScreen() {
   const [query, setQuery] = useState("");
@@ -137,22 +141,17 @@ export default function SearchScreen() {
           Search
         </ThemedText>
 
-        {/* Clean search bar */}
+        {/* Search bar styled like feed.tsx */}
         <View style={styles.searchBarContainer}>
-          <View
-            style={[
-              styles.searchInputContainer,
-              isFocused && styles.searchInputFocused,
-            ]}
-          >
-            <Text style={styles.searchIcon}>🔍</Text>
+          <View style={styles.searchWrap}>
+            <Ionicons name="search-outline" size={18} color={COLORS.sub} />
             <TextInput
               value={query}
               onChangeText={setQuery}
               onFocus={handleFocus}
               onBlur={handleBlur}
               placeholder="Search places, people, and content..."
-              placeholderTextColor={COLORS.subtext}
+              placeholderTextColor={COLORS.sub}
               style={styles.searchInput}
               returnKeyType="search"
               clearButtonMode="while-editing"
@@ -266,7 +265,7 @@ export default function SearchScreen() {
                       ? "Search name or place…"
                       : "Search name or handle…"
                   }
-                  placeholderTextColor={COLORS.subtext}
+                  placeholderTextColor={COLORS.sub}
                   style={styles.overlayInput}
                   returnKeyType="search"
                   autoCorrect={false}
@@ -300,8 +299,6 @@ export default function SearchScreen() {
                         </Pressable>
                       ))}
                     </ScrollView>
-                   
-
                   </>
                 ) : (
                   <>
@@ -310,16 +307,14 @@ export default function SearchScreen() {
                         {loading ? "Searching…" : error ? "Error" : "Results"}
                       </Text>
                       {!!debounced && (
-                        <Text style={{ color: COLORS.subtext }}>
-                          {debounced}
-                        </Text>
+                        <Text style={{ color: COLORS.sub }}>{debounced}</Text>
                       )}
                     </View>
 
                     {error ? (
                       <Text style={{ color: "#B91C1C" }}>{error}</Text>
                     ) : results.length === 0 && !loading ? (
-                      <Text style={{ color: COLORS.subtext }}>No matches.</Text>
+                      <Text style={{ color: COLORS.sub }}>No matches.</Text>
                     ) : (
                       results.map((r) => {
                         if (tab === "locations" && r.spotData) {
@@ -425,30 +420,21 @@ const styles = StyleSheet.create({
   searchBarContainer: {
     marginBottom: 20,
   },
-  searchInputContainer: {
+  searchWrap: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.bg,
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
-    paddingHorizontal: 16,
-    height: 48,
-  },
-  searchInputFocused: {
-    borderColor: COLORS.accent,
-    borderWidth: 2,
+    paddingHorizontal: 12,
+    height: 44,
   },
   searchInput: {
     flex: 1,
+    marginLeft: 8,
     fontSize: 16,
     color: COLORS.text,
-    marginLeft: 12,
-    paddingVertical: 0,
-  },
-  searchIcon: {
-    fontSize: 18,
-    color: COLORS.accent,
   },
   descriptionContainer: {
     marginBottom: 24,
@@ -456,7 +442,7 @@ const styles = StyleSheet.create({
   descriptionText: {
     fontSize: 16,
     lineHeight: 24,
-    color: COLORS.subtext,
+    color: COLORS.sub,
     marginBottom: 16,
   },
   quickActionsContainer: {
@@ -467,17 +453,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   quickActionPill: {
-    backgroundColor: "#F8F9FA",
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: "#E9ECEF",
+    backgroundColor: COLORS.chip,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   quickActionText: {
     fontSize: 14,
-    fontWeight: "500",
-    color: COLORS.accent,
+    fontWeight: "700",
+    color: COLORS.chipText,
   },
 
   overlay: {
@@ -512,7 +496,7 @@ const styles = StyleSheet.create({
   brandText: {
     fontSize: 28,
     fontWeight: "800",
-    color: COLORS.accent,
+    color: COLORS.brand,
     textTransform: "lowercase",
     letterSpacing: 0.3,
   },
@@ -529,10 +513,10 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 16,
     fontWeight: "700",
-    color: COLORS.subtext,
+    color: COLORS.sub,
   },
   tabLabelActive: {
-    color: COLORS.accent,
+    color: COLORS.brand,
   },
   tabUnderline: {
     marginTop: 10,
@@ -541,7 +525,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   tabUnderlineActive: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.brand,
   },
 
   overlaySearchWrap: {
@@ -570,7 +554,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   sectionTitle: { fontSize: 18, fontWeight: "800", color: COLORS.text },
-  link: { fontSize: 14, fontWeight: "800", color: COLORS.accent },
+  link: { fontSize: 14, fontWeight: "800", color: COLORS.brand },
 });
 
 const rowStyles = StyleSheet.create({
@@ -580,11 +564,11 @@ const rowStyles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
-    borderBottomColor: "#EFEFEF",
+    borderBottomColor: COLORS.border,
   },
   title: { fontSize: 16, fontWeight: "700", color: COLORS.text },
-  subtitle: { fontSize: 14, color: "#6B7280", marginTop: 2 },
-  chevron: { fontSize: 24, color: "#9CA3AF", marginLeft: 8 },
+  subtitle: { fontSize: 14, color: COLORS.sub, marginTop: 2 },
+  chevron: { fontSize: 24, color: COLORS.sub, marginLeft: 8 },
 });
 
 const recentStyles = StyleSheet.create({
@@ -598,11 +582,11 @@ const recentStyles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: COLORS.inputBg,
     marginBottom: 6,
   },
   name: { fontSize: 14, fontWeight: "700", color: COLORS.text },
-  handle: { fontSize: 12, color: "#6B7280" },
+  handle: { fontSize: 12, color: COLORS.sub },
   closeDot: {
     position: "absolute",
     top: 0,
@@ -610,10 +594,10 @@ const recentStyles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: COLORS.inputBg,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: COLORS.border,
   },
 });

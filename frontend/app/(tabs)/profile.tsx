@@ -211,11 +211,7 @@ export default function Profile() {
         return dateB.getTime() - dateA.getTime();
       });
 
-<<<<<<< HEAD
       console.log('Fetched full user rankings');
-=======
-      console.log("Fetched full user rankings:", sortedRankings);
->>>>>>> origin
       setUserRankings(sortedRankings);
     } catch (err) {
       console.error("Error fetching user rankings:", err);
@@ -278,11 +274,7 @@ export default function Profile() {
 
       // Then fetch the updated profile
       const profile = await userService.getUserProfile(user.uid);
-<<<<<<< HEAD
       console.log('Refreshed user profile'); // Debug log
-=======
-      console.log("Refreshed user profile:", profile); // Debug log
->>>>>>> origin
       setUserProfile(profile as UserProfile);
 
       // Fetch full ranking documents
@@ -567,10 +559,6 @@ export default function Profile() {
             <View style={styles.divider} />
             <ListRow label="Reviews" value={userProfile?.totalReviews || 0} />
             <View style={styles.divider} />
-<<<<<<< HEAD
-            <ListRow icon="🏆" label="Average Rating" value={userProfile?.averageRating ? userProfile.averageRating.toFixed(1) : '0.0'} />
-            <ListRow icon="📊" label="Average Ranking" value={userProfile?.averageRanking ? userProfile.averageRanking.toFixed(1) : '0.0'} />
-=======
             <ListRow
               label="Average Rating"
               value={
@@ -579,7 +567,6 @@ export default function Profile() {
                   : "0.0"
               }
             />
->>>>>>> origin
           </View>
 
           {/* User's Rankings */}

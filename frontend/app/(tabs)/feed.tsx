@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../../contexts/AuthContext";
 import { firestoreService } from "../../services/firestore";
 
 const COLORS = {
@@ -26,6 +27,7 @@ const COLORS = {
 };
 
 export default function Feed() {
+  const { user } = useAuth();
   const [spots, setSpots] = useState<Spot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +115,12 @@ export default function Feed() {
         console.log(`Extracted userId: ${userId}, spotId: ${spotId}`); // Debug: see extracted values
 
         if (spotId && userId) {
+          // Skip if this ranking belongs to the current user
+          if (user && userId === user.uid) {
+            console.log(`Skipping current user's ranking for spot ${spotId}`);
+            continue;
+          }
+
           const matchingSpot = allSpots.find((spot) => spot.id === spotId);
           if (matchingSpot) {
             // Fetch user data from users collection

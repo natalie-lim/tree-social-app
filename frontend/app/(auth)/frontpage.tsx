@@ -1,6 +1,6 @@
-import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function Home() {
   return (
@@ -9,15 +9,27 @@ export default function Home() {
 
       <Text style={styles.title}>LEAFLET</Text>
 
-      <PillButton label="sign up" onPress={() => router.push("/signup")} />
-      <PillButton label="login"   onPress={() => router.push("/login")} />
+      <PillButton
+        label="sign up"
+        onPress={() => router.push("/(auth)/signup")}
+      />
+      <PillButton label="login" onPress={() => router.push("/(auth)/login")} />
     </View>
   );
 }
 
-function PillButton({ label, onPress }: { label: string; onPress: () => void }) {
+function PillButton({
+  label,
+  onPress,
+}: {
+  label: string;
+  onPress: () => void;
+}) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.button, pressed && { opacity: 0.9 }]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.button, pressed && { opacity: 0.9 }]}
+    >
       <Text style={styles.buttonText}>{label}</Text>
     </Pressable>
   );

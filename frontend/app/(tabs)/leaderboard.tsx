@@ -41,6 +41,7 @@ interface LeaderboardUser {
   points: number;
   totalSpots: number;
   totalReviews: number;
+  totalRankings: number;
   averageRating: number;
 }
 
@@ -96,6 +97,7 @@ export default function Leaderboard() {
             points: points,
             totalSpots: spots,
             totalReviews: reviews,
+            totalRankings: totalRankings,
             averageRating: avg,
           };
         }
@@ -228,7 +230,7 @@ export default function Leaderboard() {
             name={item.name}
             points={item.points}
             spots={item.totalSpots}
-            reviews={item.totalReviews}
+            reviews={item.totalRankings}
             avg={item.averageRating}
           />
         )}
@@ -328,15 +330,7 @@ function RowCard({
         <Text style={styles.kpiText}>{points}</Text>
         <View style={styles.kpiChip}>
           <Ionicons name="map" size={12} color={THEME.primaryAlt} />
-          <Text style={styles.kpiChipText}>{spots}</Text>
-        </View>
-        <View style={styles.kpiChip}>
-          <Ionicons name="chatbubble" size={12} color={THEME.primaryAlt} />
           <Text style={styles.kpiChipText}>{reviews}</Text>
-        </View>
-        <View style={styles.kpiChip}>
-          <Ionicons name="star" size={12} color={THEME.primaryAlt} />
-          <Text style={styles.kpiChipText}>{avg.toFixed(1)}</Text>
         </View>
       </View>
     </View>

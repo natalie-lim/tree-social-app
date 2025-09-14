@@ -1,7 +1,7 @@
 import { Spot } from '@/components/SpotCard';
 import { ThemedText } from '@/components/themed-text';
 import { getRatingBackgroundColor, getRatingColor } from '@/utils/ratingColors';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Dimensions,
@@ -10,10 +10,35 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  Platform,
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
+
+/** Muted, on-theme palette */
+const PALETTE = {
+  cream: '#FDF1E4',      // slightly deeper cream
+  surface: '#FFFFFF',
+  ink: '#1A1C1D',        // darker text
+  sub: '#4A4E52',
+  border: '#E3E6E8',
+
+  brand: '#2F4A43',      // deep green
+  brandSoft: '#3C5E55',
+
+  park: '#CDEBC0',       // soft green accent
+  water: '#A4DDED',      // soft blue accent
+  road:  '#F7C59F',      // soft peach accent
+
+  chipBase: '#F5F7F6',
+  chipBorder: '#DDE8DD',
+  yellow: '#E9C44A',     // slightly muted yellow
+  red: '#E23F3F',        // slightly muted red
+  deepGreen: '#2D5016',  // selected "liked"
+
+  shadow: 'rgba(0,0,0,0.12)',
+};
 
 interface RankingPopupProps {
   visible: boolean;
@@ -25,34 +50,31 @@ interface RankingPopupProps {
   isLoadingComparisonSpots?: boolean;
 }
 
-// Map quick category to an initial band (top / middle / bottom third)
+/** Seed an initial search band (top/mid/bottom third) */
 const seedBandFromBucket = (
   bucket: 'liked' | 'fine' | 'disliked',
   n: number
 ) => {
   if (n <= 0) return { l: 0, r: -1 };
   const third = Math.max(1, Math.ceil(n / 3));
-  if (bucket === 'liked')   return { l: 0,        r: Math.min(n - 1, third - 1) };
-  if (bucket === 'fine')    return { l: third,    r: Math.min(n - 1, 2 * third - 1) };
-  // disliked
-  return { l: Math.min(2 * third, n - 1), r: n - 1 };
+  if (bucket === 'liked') return { l: 0, r: Math.min(n - 1, third - 1) };
+  if (bucket === 'fine') return { l: third, r: Math.min(n - 1, 2 * third - 1) };
+  return { l: Math.min(2 * third, n - 1), r: n - 1 }; // disliked
 };
 
-// Turn insertion index into a 1–10 score (top => ~10, bottom => ~1)
-const indexToScore = (insertAt: number, n: number, maxScore?: number, minScore?: number) => {
+/** Map insertion index -> 1–10 */
+const indexToScore = (
+  insertAt: number,
+  n: number,
+  maxScore?: number,
+  minScore?: number
+) => {
   if (n <= 0) return 5.5;
-  const clamped = Math.max(0, Math.min(insertAt, n)); // insertAt can be n (append)
+  const clamped = Math.max(0, Math.min(insertAt, n)); // insertAt can be n
   const normalized = 1 + 9 * (1 - clamped / n);
   let score = Math.round(normalized * 10) / 10;
-  
-  // Apply constraints
-  if (maxScore !== undefined) {
-    score = Math.min(score, maxScore);
-  }
-  if (minScore !== undefined) {
-    score = Math.max(score, minScore);
-  }
-  
+  if (maxScore !== undefined) score = Math.min(score, maxScore);
+  if (minScore !== undefined) score = Math.max(score, minScore);
   return score;
 };
 
@@ -68,7 +90,7 @@ export default function RankingPopup({
   const [baseRating, setBaseRating] = useState<number | null>(null);
   const [note, setNote] = useState('');
 
-  // 🔒 Frozen snapshot of the list for this session (prevents mid-flow mutations)
+  // Frozen list for the session to avoid mid-flow mutations
   const [sessionComparisons, setSessionComparisons] = useState<Spot[]>([]);
 
   // Binary search state
@@ -77,108 +99,107 @@ export default function RankingPopup({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [finalIndex, setFinalIndex] = useState<number | null>(null);
 
-  // Score + UX
+  // UX
   const [refinedRating, setRefinedRating] = useState<number | null>(null);
   const [comparisonCount, setComparisonCount] = useState(0);
-  const [selectedBucket, setSelectedBucket] = useState<'liked' | 'fine' | 'disliked' | null>(null);
-  const [maxAllowedScore, setMaxAllowedScore] = useState<number | null>(null);
-  const [minAllowedScore, setMinAllowedScore] = useState<number | null>(null);
-
-  // Guard against rapid double taps during a step
   const [lockStep, setLockStep] = useState(false);
 
-  // Log rating changes only when they actually change
-  useEffect(() => {
-    if (refinedRating !== null || baseRating !== null) {
-      const displayRating = refinedRating?.toFixed(1) || baseRating?.toFixed(1);
-      console.log('Rating updated:', { refinedRating, baseRating, displayRating });
-    }
-  }, [refinedRating, baseRating]);
-
-  // Build frozen, duplicate-free snapshot when modal opens (or spot changes)
+  // Reset on open/spot change — NOT on comparisonSpots (prevents chip flicker)
   useEffect(() => {
     if (!visible) return;
-
-    const filtered = (comparisonSpots || []).filter(s => s && s.id !== spot?.id);
-    // If you have a user-specific score, you can sort here (desc).
-    // filtered.sort((a,b) => (b.userScore ?? b.averageRating ?? 0) - (a.userScore ?? a.averageRating ?? 0));
-
+    const filtered = (comparisonSpots || []).filter((s) => s && s.id !== spot?.id);
     setSessionComparisons(filtered);
 
-    // reset state
+    // Reset UX state
     setBaseRating(null);
-    setSelectedBucket(null);
     setRefinedRating(null);
     setNote('');
     setFinalIndex(null);
     setComparisonCount(0);
     setLockStep(false);
-    setMaxAllowedScore(null);
-    setMinAllowedScore(null);
 
     const n = filtered.length;
     setLeft(0);
     setRight(n - 1);
     setCurrentIndex(Math.floor((0 + Math.max(-1, n - 1)) / 2));
-  }, [visible, spot?.id]); // Removed comparisonSpots to prevent constant reloading
+  }, [visible, spot?.id]); // ✅ stable
 
-  // Separate effect to update sessionComparisons when comparisonSpots change
+  // If list changes while open, refresh without resetting flow
   useEffect(() => {
     if (!visible) return;
-    
-    const filtered = (comparisonSpots || []).filter(s => s && s.id !== spot?.id);
+    const filtered = (comparisonSpots || []).filter((s) => s && s.id !== spot?.id);
     setSessionComparisons(filtered);
-    
-    // Don't reset comparison state here - let it stay stable during comparisons
   }, [comparisonSpots, visible, spot?.id]);
 
+  const selectedFor = (bucket: 'liked' | 'fine' | 'disliked') => {
+    if (baseRating === null) return false;
+    if (bucket === 'liked') return baseRating >= 7;
+    if (bucket === 'fine') return baseRating >= 4 && baseRating < 7;
+    return baseRating < 4;
+  };
+
+  const currentComparison = useMemo(
+    () =>
+      sessionComparisons.length
+        ? sessionComparisons[
+            Math.max(0, Math.min(currentIndex, sessionComparisons.length - 1))
+          ]
+        : undefined,
+    [sessionComparisons, currentIndex]
+  );
+
+  const estimatedSteps = useMemo(() => {
+    const n = sessionComparisons.length;
+    if (n <= 1) return 1;
+    return Math.ceil(Math.log2(n + 1));
+  }, [sessionComparisons.length]);
+
   const handleRatingPress = (bucket: 'liked' | 'fine' | 'disliked') => {
-    setSelectedBucket(bucket);
-  
+    // exact mapping you requested
     let rating = 5.5;
     if (bucket === 'liked') rating = 8.5;
-    if (bucket === 'disliked') rating = 2.5;
-  
+    if (bucket === 'fine') rating = 5.0;     // yellow mid
+    if (bucket === 'disliked') rating = 1.0; // red low
+
     setBaseRating(rating);
     setRefinedRating(rating);
-  
+
     const n = sessionComparisons.length;
     if (n === 0) {
       setFinalIndex(0);
       setRefinedRating(rating);
       return;
     }
-  
+
     const { l, r } = seedBandFromBucket(bucket, n);
     setLeft(l);
     setRight(r);
     setCurrentIndex(Math.floor((l + r) / 2));
-  
+
     if (l > r) {
       setFinalIndex(l);
       setRefinedRating(indexToScore(l, n));
     }
-  };  
+  };
 
   const handleComparison = (preferred: 'new' | 'existing') => {
     if (lockStep) return;
     if (finalIndex !== null || baseRating === null) return;
-  
     const n = sessionComparisons.length;
     if (n === 0) return;
-  
+
     setLockStep(true);
-    setComparisonCount(prev => prev + 1);
-  
+    setComparisonCount((c) => c + 1);
+
     let nextLeft = left;
     let nextRight = right;
-  
+
     if (preferred === 'new') {
-      nextRight = currentIndex - 1;   // new is better → search higher
+      nextRight = currentIndex - 1; // new is better → go higher
     } else {
-      nextLeft = currentIndex + 1;    // existing is better → search lower
+      nextLeft = currentIndex + 1;  // existing is better → go lower
     }
-  
+
     if (nextLeft > nextRight) {
       const insertAt = preferred === 'new' ? currentIndex : currentIndex + 1;
       setFinalIndex(insertAt);
@@ -189,9 +210,9 @@ export default function RankingPopup({
       setLeft(nextLeft);
       setRight(nextRight);
       setCurrentIndex(mid);
-      setTimeout(() => setLockStep(false), 120);
+      setTimeout(() => setLockStep(false), 90);
     }
-  };  
+  };
 
   const handleSubmit = async () => {
     if (baseRating === null) {
@@ -199,24 +220,21 @@ export default function RankingPopup({
       return;
     }
     if (!spot) return;
-  
+
     try {
       const n = sessionComparisons.length;
-      let insertAt = finalIndex ?? left; // fallback to left if unfinished
-      const finalRating = insertAt !== null
-        ? indexToScore(insertAt, n)
-        : baseRating;
-  
+      const insertAt = finalIndex ?? left; // fallback if unfinished
+      const finalRating = insertAt !== null ? indexToScore(insertAt, n) : baseRating;
+
       const rankedList = [...sessionComparisons];
       rankedList.splice(Math.max(0, Math.min(insertAt ?? n, n)), 0, spot);
-  
+
       await onSubmit(finalRating, note, rankedList);
       onClose();
     } catch (error) {
       console.error('Error submitting ranking:', error);
     }
   };
-  
 
   const handleClose = () => {
     setBaseRating(null);
@@ -225,196 +243,182 @@ export default function RankingPopup({
     setFinalIndex(null);
     setComparisonCount(0);
     setLockStep(false);
-    setMaxAllowedScore(null);
-    setMinAllowedScore(null);
     onClose();
   };
 
-  if (!spot) {
-    console.log('No spot provided, returning null');
-    return null;
-  }
+  if (!spot) return null;
+
+  const compareDisabled =
+    baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0);
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="none"               // 🔒 no flicker. Change to "fade" if preferred.
+      presentationStyle="overFullScreen"
       onRequestClose={handleClose}
     >
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={handleClose} />
-  
-        <View style={styles.popupContainer}>
-          {/* Spot Header */}
-          <View style={styles.spotHeader}>
-            <ThemedText style={styles.spotName}>{spot.name}</ThemedText>
-            <Pressable style={styles.closeButton} onPress={handleClose}>
-              <ThemedText style={styles.closeButtonText}>✕</ThemedText>
+
+        <View style={styles.popup} renderToHardwareTextureAndroid>
+          {/* Header */}
+          <View style={styles.header}>
+            <ThemedText style={styles.title} numberOfLines={1}>
+              {spot.name}
+            </ThemedText>
+            <Pressable style={styles.close} onPress={handleClose}>
+              <ThemedText style={styles.closeTxt}>✕</ThemedText>
             </Pressable>
           </View>
-  
-          <View style={styles.contentContainer}>
-            {/* Quick Rating */}
-            <View style={styles.ratingSection}>
+
+          {/* Body */}
+          <View style={styles.body}>
+            {/* Chips */}
+            <View style={styles.section}>
               <ThemedText style={styles.sectionTitle}>How was your experience?</ThemedText>
-              <View style={styles.ratingContainer}>
-                {[
-                  { label: 'I enjoyed it', bucket: 'liked', color: '#2D5016' },
-                  { label: 'It was fine', bucket: 'fine', color: '#8B5A2B' },
-                  { label: "I did not enjoy it", bucket: 'disliked', color: '#8B4513' },
-                ].map(({ label, bucket, color }) => (
-                  <TouchableOpacity
-                    key={bucket}
-                    style={[
-                      styles.ratingButton,
-                      baseRating !== null &&
-                        ((bucket === 'liked' && baseRating >= 7) ||
-                          (bucket === 'fine' && baseRating >= 4 && baseRating < 7) ||
-                          (bucket === 'disliked' && baseRating < 4)) && {
-                          backgroundColor: color,
-                        },
-                    ]}
-                    onPress={() => handleRatingPress(bucket as any)}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.ratingButtonText,
-                        baseRating !== null &&
-                          ((bucket === 'liked' && baseRating >= 7) ||
-                            (bucket === 'fine' && baseRating >= 4 && baseRating < 7) ||
-                            (bucket === 'disliked' && baseRating < 4)) && {
-                            color: '#FFFFFF',
-                          },
-                      ]}
-                    >
-                      {label}
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))}
+
+              <View style={styles.chipsRow}>
+                <TouchableOpacity
+                  style={[styles.chip, selectedFor('liked') && styles.chipSelectedGreen]}
+                  onPress={() => handleRatingPress('liked')}
+                  activeOpacity={0.9}
+                >
+                  <ThemedText style={[styles.chipTxt, selectedFor('liked') && styles.chipTxtOnDark]}>
+                    I enjoyed it
+                  </ThemedText>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.chip, selectedFor('fine') && styles.chipSelectedYellow]}
+                  onPress={() => handleRatingPress('fine')}
+                  activeOpacity={0.9}
+                >
+                  <ThemedText style={[styles.chipTxt, selectedFor('fine') && styles.chipTxtOnLight]}>
+                    It was fine
+                  </ThemedText>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.chip, selectedFor('disliked') && styles.chipSelectedRed]}
+                  onPress={() => handleRatingPress('disliked')}
+                  activeOpacity={0.9}
+                >
+                  <ThemedText style={[styles.chipTxt, selectedFor('disliked') && styles.chipTxtOnDark]}>
+                    I did not enjoy it
+                  </ThemedText>
+                </TouchableOpacity>
               </View>
             </View>
-  
-            {/* Comparison Section */}
+
+            {/* Comparison */}
             {(sessionComparisons.length > 0 || isLoadingComparisonSpots) && (
-                <View style={styles.comparisonSection}>
-  
-                  <View style={styles.comparisonContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.comparisonCard, 
-                        styles.comparisonChoice,
-                        (baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0)) && styles.comparisonCardDisabled
-                      ]}
-                      onPress={() => baseRating !== null && finalIndex === null && !(isLoadingComparisonSpots && sessionComparisons.length === 0) && handleComparison('new')}
-                      disabled={baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0)}
-                    >
-                      <ThemedText style={[
-                        styles.comparisonName,
-                        (baseRating === null || finalIndex !== null || isLoadingComparisonSpots) && styles.comparisonTextDisabled
-                      ]}>
-                        {spot.name}
-                      </ThemedText>
-                      <ThemedText style={[
-                        styles.comparisonSubtext,
-                        (baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0)) && styles.comparisonTextDisabled
-                      ]}>
-                        {(isLoadingComparisonSpots && sessionComparisons.length === 0) ? 'Loading...' : baseRating === null ? 'Select rating first' : finalIndex !== null ? 'Comparison complete' : 'This one'}
-                      </ThemedText>
-                    </TouchableOpacity>
-
-                    <ThemedText style={styles.vsText}>vs</ThemedText>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.comparisonCard, 
-                        styles.comparisonChoice,
-                        (baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0)) && styles.comparisonCardDisabled
-                      ]}
-                      onPress={() => baseRating !== null && finalIndex === null && !(isLoadingComparisonSpots && sessionComparisons.length === 0) && handleComparison('existing')}
-                      disabled={baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0)}
-                    >
-                      <ThemedText style={[
-                        styles.comparisonName,
-                        (baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0)) && styles.comparisonTextDisabled
-                      ]}>
-                        {(isLoadingComparisonSpots && sessionComparisons.length === 0) ? 'Loading...' : sessionComparisons[Math.max(0, Math.min(currentIndex, sessionComparisons.length - 1))]?.name || 'Another Spot'}
-                      </ThemedText>
-                      <ThemedText style={[
-                        styles.comparisonSubtext,
-                        (baseRating === null || finalIndex !== null || (isLoadingComparisonSpots && sessionComparisons.length === 0)) && styles.comparisonTextDisabled
-                      ]}>
-                        {(isLoadingComparisonSpots && sessionComparisons.length === 0) ? 'Loading...' : baseRating === null ? 'Select rating first' : finalIndex !== null ? 'Comparison complete' : 'That one'}
-                      </ThemedText>
-                    </TouchableOpacity>
-                  </View>
+              <View style={styles.section}>
+                <View style={styles.sectionHeaderRow}>
+                  <ThemedText style={styles.sectionTitle}>Compare</ThemedText>
+                  {baseRating !== null && finalIndex === null && sessionComparisons.length > 0 && (
+                    <ThemedText style={styles.progressText}>
+                      Step {Math.max(1, comparisonCount + 1)} of ~{Math.ceil(Math.log2(sessionComparisons.length + 1))}
+                    </ThemedText>
+                  )}
                 </View>
-              )}
-  
-            {/* Final Rating (only after comparisons or immediate finalization) */}
-            {finalIndex !== null && refinedRating !== null && (
-              <View
-                style={[
-                  styles.ratingDisplay,
-                  { backgroundColor: getRatingBackgroundColor(refinedRating) },
-                ]}
-              >
-                <ThemedText style={styles.ratingLabel}>Your Rating</ThemedText>
-                <View style={styles.ratingValueContainer}>
-                  <ThemedText
-                    style={[
-                      styles.ratingValue,
-                      { color: getRatingColor(refinedRating) },
-                    ]}
+
+                <View style={styles.compareRow}>
+                  <TouchableOpacity
+                    style={[styles.card, styles.cardPark, compareDisabled && styles.cardDisabled]}
+                    onPress={() => !compareDisabled && handleComparison('new')}
+                    disabled={compareDisabled}
+                    activeOpacity={0.9}
                   >
-                    {refinedRating.toFixed(1)}/10
-                  </ThemedText>
+                    <View style={styles.cardAccent} />
+                    <ThemedText style={styles.cardTitle} numberOfLines={2}>
+                      {spot.name}
+                    </ThemedText>
+                    <ThemedText style={styles.cardHint}>
+                      {compareDisabled
+                        ? (isLoadingComparisonSpots && sessionComparisons.length === 0)
+                          ? 'Loading…'
+                          : baseRating === null
+                          ? 'Select rating first'
+                          : 'Comparison complete'
+                        : 'Prefer this'}
+                    </ThemedText>
+                  </TouchableOpacity>
+
+                  <ThemedText style={styles.vs}>vs</ThemedText>
+
+                  <TouchableOpacity
+                    style={[styles.card, styles.cardWater, compareDisabled && styles.cardDisabled]}
+                    onPress={() => !compareDisabled && handleComparison('existing')}
+                    disabled={compareDisabled}
+                    activeOpacity={0.9}
+                  >
+                    <View style={[styles.cardAccent, { backgroundColor: '#8DD2E6' }]} />
+                    <ThemedText style={styles.cardTitle} numberOfLines={2}>
+                      {currentComparison?.name || (isLoadingComparisonSpots ? 'Loading…' : 'Another Spot')}
+                    </ThemedText>
+                    <ThemedText style={styles.cardHint}>
+                      {compareDisabled
+                        ? (isLoadingComparisonSpots && sessionComparisons.length === 0)
+                          ? 'Loading…'
+                          : baseRating === null
+                          ? 'Select rating first'
+                          : 'Comparison complete'
+                        : 'Prefer that'}
+                    </ThemedText>
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
-  
-            {/* Note Section */}
-            {baseRating !== null && (
-              <View style={styles.noteSection}>
-                <ThemedText style={styles.sectionTitle}>
-                  Add a note (optional)
+
+            {/* Final Rating */}
+            {finalIndex !== null && refinedRating !== null && (
+              <View style={[styles.score, { backgroundColor: getRatingBackgroundColor(refinedRating) }]}>
+                <ThemedText style={styles.scoreLabel}>Your Rating</ThemedText>
+                <ThemedText style={[styles.scoreValue, { color: getRatingColor(refinedRating) }]}>
+                  {refinedRating.toFixed(1)}/10
                 </ThemedText>
-                <View style={styles.noteInputContainer}>
+              </View>
+            )}
+
+            {/* Note */}
+            {baseRating !== null && (
+              <View style={styles.section}>
+                <ThemedText style={styles.sectionTitle}>Add a note (optional)</ThemedText>
+                <View style={styles.noteCard}>
                   <TextInput
                     style={styles.noteInput}
                     value={note}
                     onChangeText={setNote}
-                    placeholder="Share your experience..."
-                    placeholderTextColor="#9CA3AF"
+                    placeholder="Share your experience…"
+                    placeholderTextColor="#7B8083"
                     multiline
                     numberOfLines={3}
                     textAlignVertical="top"
                     returnKeyType="done"
-                    blurOnSubmit={true}
+                    blurOnSubmit
                   />
                 </View>
               </View>
             )}
-  
+
             {/* Submit */}
             {baseRating !== null && (
-              <View style={styles.submitSection}>
+              <View style={styles.footer}>
                 <TouchableOpacity
                   style={[
-                    styles.submitButton,
-                    {
-                      backgroundColor: getRatingColor(
-                        refinedRating || baseRating
-                      ),
-                    },
-                    isSubmitting && styles.submitButtonDisabled,
+                    styles.submit,
+                    { backgroundColor: getRatingColor(refinedRating || baseRating) },
+                    isSubmitting && styles.submitDisabled,
                   ]}
                   onPress={handleSubmit}
                   disabled={isSubmitting}
+                  activeOpacity={0.9}
                 >
-                  <ThemedText style={styles.submitButtonText}>
+                  <ThemedText style={styles.submitTxt}>
                     {isSubmitting
-                      ? 'Saving...'
+                      ? 'Saving…'
                       : finalIndex !== null && refinedRating !== null
                       ? `Save Rating (${refinedRating.toFixed(1)})`
                       : 'Save Rating'}
@@ -426,282 +430,161 @@ export default function RankingPopup({
         </View>
       </View>
     </Modal>
-  );  
+  );
 }
 
 const styles = StyleSheet.create({
-  overlay: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.6)', 
-    justifyContent: 'center', 
-    alignItems: 'center' 
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 12,
   },
-  backdrop: { 
-    position: 'absolute', 
-    top: 0, 
-    left: 0, 
-    right: 0, 
-    bottom: 0 
-  },
-  popupContainer: { 
-    width: width * 0.9, 
-    maxHeight: height * 0.85, 
-    backgroundColor: '#fff', 
+  backdrop: { ...StyleSheet.absoluteFillObject },
+
+  popup: {
+    width: width * 0.92,
+    maxHeight: height * 0.9,
     borderRadius: 24,
-    shadowColor: '#000',
+    backgroundColor: PALETTE.surface,
+    overflow: 'hidden',
+    shadowColor: PALETTE.shadow,
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.18,
     shadowRadius: 20,
-    elevation: 15,
+    elevation: 10,
   },
-  contentContainer: {
-    paddingBottom: 20
-  },
-  spotHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    padding: 20, 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#eee' 
-  },
-  spotName: { 
-    fontSize: 20, 
-    fontWeight: '700',
-    flex: 1,
-    marginRight: 10
-  },
-  closeButton: { 
-    padding: 8, 
-    borderRadius: 16, 
-    backgroundColor: '#f0f0f0',
-    borderWidth: 1,
-    borderColor: '#e0e0e0'
-  },
-  closeButtonText: { 
-    fontSize: 16,
-    color: '#1a1a1a',
-    fontWeight: '600'
-  },
-  sectionTitle: { 
-    fontSize: 18, 
-    fontWeight: '700', 
-    marginBottom: 12,
-    color: '#1a1a1a'
-  },
-  ratingSection: { 
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 6
-  },
-  ratingContainer: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-around',
-    marginBottom: 8
-  },
-  ratingButton: { 
-    flex: 1, 
-    marginHorizontal: 4, 
-    padding: 12, 
-    borderRadius: 16, 
-    backgroundColor: '#F8F9FA', 
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E8F5E8',
-    shadowColor: '#2D5016',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2
-  },
-  ratingButtonText: { 
-    fontSize: 14, 
-    fontWeight: '700',
-    color: '#1a1a1a'
-  },
-  ratingDisplay: {
+
+  header: {
+    backgroundColor: PALETTE.brand,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 12,
-    borderWidth: 2,
-    borderColor: '#e0e0e0'
   },
-  ratingLabel: {
-    fontSize: 14,
-    color: '#1a1a1a',
-    fontWeight: '600'
-  },
-  ratingValueContainer: {
-    alignItems: 'flex-end'
-  },
-  ratingValue: {
-    fontSize: 20,
-    fontWeight: '700'
-  },
-  comparisonSection: { 
-    paddingHorizontal: 20,
-    paddingVertical: 4
-  },
-  comparisonSubtitle: {
-    fontSize: 14,
-    color: '#1a1a1a',
-    marginBottom: 16,
-    textAlign: 'center',
-    fontWeight: '500'
-  },
-  comparisonContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center' 
-  },
-  comparisonCard: { 
-    flex: 1, 
-    backgroundColor: '#ffffff', 
-    borderRadius: 12, 
-    padding: 16, 
-    marginHorizontal: 4, 
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2
-  },
-  comparisonName: { 
-    fontSize: 16, 
-    fontWeight: '700', 
-    marginBottom: 4,
-    textAlign: 'center',
-    color: '#1a1a1a'
-  },
-  comparisonScore: { 
-    fontSize: 14, 
-    color: '#2D5016',
-    fontWeight: '700',
-    marginBottom: 2
-  },
-  comparisonSubtext: {
-    fontSize: 10,
-    color: '#2D5016',
-    fontStyle: 'italic',
-    fontWeight: '600'
-  },
-  orSeparator: { 
-    paddingHorizontal: 8 
-  },
-  orText: { 
-    fontSize: 14, 
-    fontWeight: '700',
-    color: '#ffffff',
-    backgroundColor: '#2D5016',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16
-  },
-  progressContainer: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#e8f5e8',
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2D5016'
-  },
-  progressText: {
-    fontSize: 12,
-    color: '#1a1a1a',
-    fontStyle: 'italic',
-    fontWeight: '600'
-  },
-  noteSection: { 
-    paddingHorizontal: 20,
-    paddingVertical: 4
-  },
-  noteInputContainer: { 
-    backgroundColor: '#ffffff', 
-    borderRadius: 12, 
-    borderWidth: 2, 
-    borderColor: '#e0e0e0', 
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1
-  },
-  noteInput: { 
-    fontSize: 14, 
-    minHeight: 80, 
-    textAlignVertical: 'top',
-    color: '#1a1a1a',
-    lineHeight: 20
-  },
-  submitSection: { 
-    paddingHorizontal: 20,
-    paddingTop: 4,
-    paddingBottom: 16
-  },
-  submitButton: { 
-    borderRadius: 16, 
-    paddingVertical: 16, 
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3
-  },
-  submitButtonDisabled: { 
-    backgroundColor: '#ccc' 
-  },
-  submitButtonText: { 
-    color: '#fff', 
-    fontWeight: '700',
-    fontSize: 16
-  },
-  comparisonChoice: {
-    flex: 1,
-    padding: 20,
-    borderRadius: 16,
-    backgroundColor: '#F9FAFB',
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
+  title: { flex: 1, color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  close: {
+    height: 28,
+    width: 28,
+    borderRadius: 14,
+    backgroundColor: PALETTE.brandSoft,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
   },
-  vsText: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginHorizontal: 12,
-    color: '#6B7280',
+  closeTxt: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+
+  body: { backgroundColor: PALETTE.cream, paddingBottom: 16 },
+
+  section: { paddingHorizontal: 18, paddingTop: 14 },
+  sectionHeaderRow: {
+    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
   },
-  progressWrapper: {
-    height: 8,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 4,
-    marginTop: 12,
-    overflow: 'hidden',
+  sectionTitle: { fontSize: 15, fontWeight: '900', color: PALETTE.ink, marginBottom: 10 },
+
+  chipsRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  chip: {
+    flex: 1,
+    marginHorizontal: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: PALETTE.chipBase,
+    borderWidth: 1.5,
+    borderColor: PALETTE.chipBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: { shadowColor: 'rgba(0,0,0,0.06)', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 },
+      android: { elevation: 1 },
+    }),
   },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#10B981',
-    borderRadius: 4,
+  chipSelectedGreen: { backgroundColor: PALETTE.deepGreen, borderColor: PALETTE.deepGreen },
+  chipSelectedYellow: { backgroundColor: PALETTE.yellow, borderColor: PALETTE.yellow },
+  chipSelectedRed: { backgroundColor: PALETTE.red, borderColor: PALETTE.red },
+  chipTxt: { fontSize: 13, fontWeight: '800', color: PALETTE.ink },
+  chipTxtOnDark: { color: '#FFFFFF' },
+  chipTxtOnLight: { color: '#1A1A1A' },
+
+  compareRow: { flexDirection: 'row', alignItems: 'center' },
+  card: {
+    flex: 1,
+    backgroundColor: PALETTE.surface,
+    borderRadius: 14,
+    padding: 16,
+    marginHorizontal: 6,
+    borderWidth: 1,
+    borderColor: PALETTE.border,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: { shadowColor: 'rgba(0,0,0,0.08)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8 },
+      android: { elevation: 2 },
+    }),
+    position: 'relative',
   },
-  comparisonCardDisabled: {
-    backgroundColor: '#F3F4F6',
-    borderColor: '#D1D5DB',
-    opacity: 0.6,
+  cardPark: {},
+  cardWater: {},
+  cardAccent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: '#B9E2AF', // park
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
   },
-  comparisonTextDisabled: {
-    color: '#9CA3AF',
+  cardDisabled: { backgroundColor: '#F3F4F6', borderColor: '#D1D5DB', opacity: 0.65 },
+  cardTitle: { fontSize: 15, fontWeight: '900', color: PALETTE.ink, textAlign: 'center', marginBottom: 6 },
+  cardHint: { fontSize: 11, color: PALETTE.sub, fontWeight: '600' },
+  vs: { marginHorizontal: 6, fontSize: 13, fontWeight: '900', color: PALETTE.sub },
+
+  progressText: { fontSize: 12, color: PALETTE.sub, fontWeight: '800' },
+
+  score: {
+    marginHorizontal: 18,
+    marginTop: 14,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: PALETTE.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: PALETTE.surface,
   },
+  scoreLabel: { fontSize: 13, fontWeight: '800', color: PALETTE.ink },
+  scoreValue: { fontSize: 22, fontWeight: '900' },
+
+  noteCard: {
+    backgroundColor: PALETTE.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: PALETTE.border,
+    padding: 10,
+  },
+  noteInput: {
+    fontSize: 14,
+    minHeight: 92,
+    color: PALETTE.ink,
+    lineHeight: 20,
+    textAlignVertical: 'top',
+  },
+
+  footer: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 16 },
+  submit: {
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: { shadowColor: 'rgba(0,0,0,0.10)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 },
+      android: { elevation: 3 },
+    }),
+  },
+  submitDisabled: { backgroundColor: '#C7CED0' },
+  submitTxt: { color: '#FFFFFF', fontWeight: '900', fontSize: 16 },
 });

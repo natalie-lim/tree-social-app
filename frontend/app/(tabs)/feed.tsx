@@ -14,6 +14,16 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { firestoreService } from "../../services/firestore";
 
+// Extended Spot type for feed with ranking user information
+interface SpotWithRanking extends Spot {
+  rankingUser?: {
+    userId: string;
+    userName: string;
+    userDisplayName: string;
+    userNotes?: string;
+  };
+}
+
 const COLORS = {
   bg: "#FFF6EC", // soft cream
   brand: "#2F4A43", // deep green (logo / active)
@@ -27,7 +37,7 @@ const COLORS = {
 
 export default function Feed() {
   const { user } = useAuth();
-  const [spots, setSpots] = useState<Spot[]>([]);
+  const [spots, setSpots] = useState<SpotWithRanking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,7 +149,7 @@ export default function Feed() {
         }
       }
 
-      setSpots(spotsWithUsers as any[]);
+      setSpots(spotsWithUsers as SpotWithRanking[]);
     } catch (err) {
       console.error("Error fetching spots:", err);
       setError("Failed to load spots");
@@ -223,7 +233,7 @@ export default function Feed() {
           </Text>
         </View>
       ) : (
-        spots.map((spot: any) => (
+        spots.map((spot: SpotWithRanking) => (
           <SpotCard
             key={spot.id}
             spot={spot}

@@ -1,19 +1,16 @@
-// app/map.tsx
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+// app/(tabs)/map.tsx
+import * as Location from "expo-location"; // ✅ ask for permission + get coords
+import { router, useNavigation } from "expo-router";
+import { collection, onSnapshot } from "firebase/firestore";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Platform,
   StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
 } from "react-native";
-
-import { Ionicons } from "@expo/vector-icons";
-import { router, useNavigation } from "expo-router";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
-
-import { collection, onSnapshot } from "firebase/firestore";
+import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
 import { Spot } from "../../components/SpotCard";
 import { db } from "../../config/firebase";
 
@@ -35,13 +32,46 @@ const COLORS = {
 export default function MapScreen() {
   const nav = useNavigation();
   useLayoutEffect(() => {
-    // Hide the default (black) header
     nav.setOptions?.({ headerShown: false });
   }, [nav]);
 
   const [spots, setSpots] = useState<Spot[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 👇 user location state
+  const [userRegion, setUserRegion] = useState<Region | null>(null);
+  const mapRef = useRef<MapView | null>(null);
+
+  // 🔹 Ask for permission and read current position
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.LocationAccuracy.Balanced,
+        });
+
+        const region: Region = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          latitudeDelta: 0.08,
+          longitudeDelta: 0.08,
+        };
+        setUserRegion(region);
+
+        // If map already mounted, animate to user
+        if (mapRef.current) {
+          mapRef.current.animateToRegion(region, 600);
+        }
+      } catch {
+        // ignore, we’ll fall back to spots/default
+      }
+    })();
+  }, []);
+
+  // 🔹 Firestore spots
   useEffect(() => {
     const unsub = onSnapshot(
       collection(db, "spots"),
@@ -51,11 +81,7 @@ export default function MapScreen() {
             const x = d.data() as any;
             const lat = Number(x?.location?.coordinates?.latitude);
             const lng = Number(x?.location?.coordinates?.longitude);
-
-            // Only include spots with valid coordinates
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-              return null;
-            }
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
             return {
               id: d.id,
@@ -64,10 +90,7 @@ export default function MapScreen() {
               category: x?.category ?? "",
               location: {
                 address: x?.location?.address ?? "",
-                coordinates: {
-                  latitude: lat,
-                  longitude: lng,
-                },
+                coordinates: { latitude: lat, longitude: lng },
               },
               photos: x?.photos ?? [],
               amenities: x?.amenities ?? [],
@@ -89,9 +112,24 @@ export default function MapScreen() {
               updatedAt: x?.updatedAt ?? new Date(),
             } as Spot;
           })
-          .filter((spot): spot is Spot => spot !== null);
+          .filter((s): s is Spot => s !== null);
+
         setSpots(spotData);
         setLoading(false);
+
+        // If we don’t have user location, center on first spot once
+        if (!userRegion && spotData.length && mapRef.current) {
+          const first = spotData[0].location.coordinates;
+          mapRef.current.animateToRegion(
+            {
+              latitude: first.latitude,
+              longitude: first.longitude,
+              latitudeDelta: 0.08,
+              longitudeDelta: 0.08,
+            },
+            600
+          );
+        }
       },
       (err) => {
         console.warn("Firestore error:", err);
@@ -99,40 +137,44 @@ export default function MapScreen() {
       }
     );
     return unsub;
-  }, []);
+  }, [userRegion]);
 
-  const initialRegion = useMemo(() => {
+  // ✅ initial region preference: user → first spot → default (Philadelphia)
+  const initialRegion = useMemo<Region>(() => {
+    if (userRegion) return userRegion;
     const first = spots[0];
-    return first
-      ? {
-          latitude: first.location.coordinates.latitude,
-          longitude: first.location.coordinates.longitude,
-          latitudeDelta: 0.08,
-          longitudeDelta: 0.08,
-        }
-      : {
-          latitude: 39.9526,
-          longitude: -75.1652,
-          latitudeDelta: 0.08,
-          longitudeDelta: 0.08,
-        };
-  }, [spots]);
+    if (first) {
+      return {
+        latitude: first.location.coordinates.latitude,
+        longitude: first.location.coordinates.longitude,
+        latitudeDelta: 0.08,
+        longitudeDelta: 0.08,
+      };
+    }
+    return {
+      latitude: 39.9526,
+      longitude: -75.1652,
+      latitudeDelta: 0.08,
+      longitudeDelta: 0.08,
+    };
+  }, [userRegion, spots]);
 
   return (
     <View style={styles.screen}>
-  
-
-      {/* Map / Loader */}
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator />
         </View>
       ) : (
         <MapView
+          ref={(r) => (mapRef.current = r)}
           style={{ flex: 1 }}
-          provider={PROVIDER_GOOGLE}
+          provider={PROVIDER_GOOGLE} // custom style requires Google provider on iOS
           customMapStyle={COLORFUL_MAP_STYLE}
           initialRegion={initialRegion}
+          showsUserLocation // blue dot
+          followsUserLocation={false}
+          showsMyLocationButton={Platform.OS === "android"}
         >
           {spots.map((spot) => (
             <Marker
@@ -152,7 +194,7 @@ export default function MapScreen() {
               <View style={{ alignItems: "center", justifyContent: "center" }}>
                 <Image
                   source={require("../../assets/images/mapleaf.png")}
-                  style={{ width: 50, height: 50, tintColor: "#2F8C46" }} // bigger + green tint
+                  style={{ width: 50, height: 50, tintColor: "#2F8C46" }}
                   resizeMode="contain"
                 />
               </View>
@@ -166,82 +208,25 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.bg },
-  topBar: {
-    height: 100,
-    paddingHorizontal: 16,
-    backgroundColor: COLORS.bg, // full cream background
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border, // full-width border
-    flexDirection: "row",
-    alignItems: "center", // vertically center back + text
-  },
-  brand: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: COLORS.brand,
-    paddingTop: 40,
-  },
-  rightIcons: { width: 32, alignItems: "flex-end" }, // keeps brand centered
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
 });
 
-// leafyMapStyle.ts
+// leafyMapStyle.ts (kept inline, as in your file)
 export const COLORFUL_MAP_STYLE = [
-  // --- Base land & water ---
   { featureType: "landscape", stylers: [{ color: "#FFF6EC" }] },
   { featureType: "water", stylers: [{ color: "#A4DDED" }] },
-
-  // --- Parks & natural areas ---
-  {
-    featureType: "poi.park",
-    stylers: [{ color: "#CDEBC0" }, { visibility: "on" }],
-  },
+  { featureType: "poi.park", stylers: [{ color: "#CDEBC0" }, { visibility: "on" }] },
   { featureType: "landscape.natural", stylers: [{ color: "#E5F5D7" }] },
-
-  // --- Highways (keep visible, but hide shields) ---
-  {
-    featureType: "road.highway",
-    stylers: [{ color: "#F7C59F" }, { visibility: "on" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "labels.icon", // highway shield/number
-    stylers: [{ visibility: "off" }],
-  },
-
-  // --- Arterial roads (hidden) ---
+  { featureType: "road.highway", stylers: [{ color: "#F7C59F" }, { visibility: "on" }] },
+  { featureType: "road.highway", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
   { featureType: "road.arterial", stylers: [{ visibility: "off" }] },
-
-  // --- Local roads (hidden) ---
   { featureType: "road.local", stylers: [{ visibility: "off" }] },
-
-  // --- Admin boundaries & labels ---
   {
-    featureType: "administrative.locality", // city names
+    featureType: "administrative.locality",
     elementType: "labels.text.fill",
     stylers: [{ color: "#2F4A43" }, { visibility: "on" }],
   },
-  {
-    featureType: "administrative.neighborhood", // small towns/areas
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#2F4A43" }, { visibility: "on" }],
-  },
-  {
-    featureType: "administrative.province",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#334E68" }, { visibility: "on" }],
-  },
-  {
-    featureType: "administrative.country",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#2B2D42" }, { visibility: "on" }],
-  },
-  {
-    elementType: "labels.text.stroke",
-    stylers: [{ color: "#ffffff" }, { weight: 2 }],
-  },
-
-  // --- Hide clutter ---
+  { elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 2 }] },
   { featureType: "poi", stylers: [{ visibility: "off" }] },
   { featureType: "transit", stylers: [{ visibility: "off" }] },
 ];

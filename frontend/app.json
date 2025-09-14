@@ -8,9 +8,18 @@
     "scheme": "leafletapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    
+
+
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We need your location to show nearby spots on the map.",
+        "NSLocationAlwaysUsageDescription": "We need your location to keep the map centered on you."
+      }
     },
+
+    
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

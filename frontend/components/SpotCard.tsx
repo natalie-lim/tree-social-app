@@ -57,6 +57,7 @@ interface SpotCardProps {
   userName?: string;
   userDisplayName?: string;
   userNotes?: string;
+  userRating?: number;
 }
 
 const { width } = Dimensions.get("window");
@@ -69,6 +70,7 @@ export function SpotCard({
   userName,
   userDisplayName,
   userNotes,
+  userRating,
 }: SpotCardProps) {
   const { user } = useAuth();
   const [resolvedName, setResolvedName] = useState<string | undefined>(
@@ -190,7 +192,18 @@ export function SpotCard({
           </View>
 
           {/* Right side - Rating circle */}
-          {spot.averageRating > 0 && (
+          {(userRating && userRating > 0) ? (
+            <View
+              style={[
+                styles.ratingCircle,
+                { backgroundColor: getRatingColor(userRating) },
+              ]}
+            >
+              <Text style={styles.ratingText}>
+                {userRating.toFixed(1)}
+              </Text>
+            </View>
+          ) : spot.averageRating > 0 ? (
             <View
               style={[
                 styles.ratingCircle,
@@ -201,7 +214,7 @@ export function SpotCard({
                 {spot.averageRating.toFixed(1)}
               </Text>
             </View>
-          )}
+          ) : null}
         </View>
 
         {/* User Notes Section */}

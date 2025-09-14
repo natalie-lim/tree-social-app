@@ -22,6 +22,7 @@ interface SpotWithRanking extends Spot {
     userName: string;
     userDisplayName: string;
     userNotes?: string;
+    rating?: number;
   };
 }
 
@@ -114,7 +115,7 @@ export default function Feed() {
               userDataTyped?.displayName || userDataTyped?.email || "User";
 
             spotsWithUsers.push({
-              ...matchingSpot,
+              ...(matchingSpot as Spot),
               rankingUser: {
                 userId: userId,
                 userName: finalUserName,
@@ -123,6 +124,7 @@ export default function Feed() {
                   rankingData.note ||
                   rankingData.notes ||
                   rankingData.description,
+                rating: rankingData.rating || 0,
                 createdAt: rankingData.createdAt || rankingData.timestamp,
               },
             });
@@ -130,10 +132,9 @@ export default function Feed() {
         }
       }
 
-      setSpots(spotsWithUsers as SpotWithRanking[]);
       // Rankings are already sorted by createdAt desc from the query
       // No additional sorting needed since we're processing them in order
-      setSpots(spotsWithUsers as any[]);
+      setSpots(spotsWithUsers as SpotWithRanking[]);
     } catch (err) {
       console.error("Error fetching spots:", err);
       setError("Failed to load spots");
@@ -213,6 +214,14 @@ export default function Feed() {
       {/* Feed content */}
       <Text style={styles.sectionTitle}>Discover Spots</Text>
 
+      {/* Refreshing indicator */}
+      {refreshing && (
+        <View style={styles.refreshingContainer}>
+          <ActivityIndicator size="small" color={COLORS.brand} style={styles.refreshingSpinner} />
+          <Text style={styles.refreshingText}>Refreshing feed...</Text>
+        </View>
+      )}
+
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.brand} />
@@ -235,7 +244,7 @@ export default function Feed() {
       ) : (
         spots.map((spot: any, index: number) => (
           <SpotCard
-            key={`${spot.id}-${spot.rankingUser?.userId || index}`}
+            key={`${spot.id}-${spot.rankingUser?.userId}-${index}`}
             spot={spot}
             onPress={handleSpotPress}
             style={styles.spotCard}
@@ -243,6 +252,7 @@ export default function Feed() {
             userName={spot.rankingUser?.userName}
             userDisplayName={spot.rankingUser?.userDisplayName}
             userNotes={spot.rankingUser?.userNotes}
+            userRating={spot.rankingUser?.rating}
           />
         ))
       )}
@@ -388,5 +398,19 @@ const styles = StyleSheet.create({
     color: COLORS.chipText,
     fontSize: 16,
     fontWeight: "600",
+  },
+  refreshingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  refreshingSpinner: {
+    marginRight: 8,
+  },
+  refreshingText: {
+    fontSize: 14,
+    color: COLORS.brand,
+    fontWeight: "500",
   },
 });

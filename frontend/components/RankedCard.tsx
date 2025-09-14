@@ -46,16 +46,7 @@ export function RankedCard({ ranking, onPress, style }: RankedCardProps) {
         <View style={styles.mainRow}>
           {/* Left side - Image and Spot info */}
           <View style={styles.leftSection}>
-            {/* Picture square */}
-            <View style={styles.imageContainer}>
-              {spotImage ? (
-                <Image source={{ uri: spotImage }} style={styles.spotImage} resizeMode="cover" />
-              ) : (
-                <View style={styles.imagePlaceholder}>
-                  <Text style={styles.placeholderText}>📷</Text>
-                </View>
-              )}
-            </View>
+            
             
             {/* Spot info */}
             <View style={styles.spotInfo}>

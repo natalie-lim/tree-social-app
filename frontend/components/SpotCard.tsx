@@ -119,19 +119,6 @@ export function SpotCard({
 
 
 
-  const goToMap = () => {
-    const { latitude, longitude } = spot.location.coordinates || {};
-    if (latitude == null || longitude == null) return;
-    router.push({
-      pathname: "/map",
-      params: {
-        lat: String(latitude),
-        lng: String(longitude),
-        name: spot.name,
-        spotId: spot.id,
-      },
-    });
-  };
 
   return (
     <Pressable style={[styles.card, style]} onPress={() => onPress?.(spot)}>
@@ -152,12 +139,10 @@ export function SpotCard({
             </View>
 
 
-            {/* Address → Map */}
-            <Pressable onPress={goToMap} accessibilityRole="link" hitSlop={6}>
-              <ThemedText style={styles.spotLocation} numberOfLines={1}>
-                {spot.location.address}
-              </ThemedText>
-            </Pressable>
+            {/* Address */}
+            <ThemedText style={styles.spotLocation} numberOfLines={1}>
+              {spot.location.address}
+            </ThemedText>
           </View>
 
           {/* Right side - Rating circle */}
@@ -248,10 +233,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // Address → Map
+  // Address
   spotLocation: {
     fontSize: 14,
-    color: "#2F4A43", // darker so it reads as tappable
+    color: "#6B7280", // regular text color
   },
 
   ratingCircle: {

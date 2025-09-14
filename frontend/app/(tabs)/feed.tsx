@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -29,15 +30,20 @@ export default function Feed() {
   const { user } = useAuth();
   const [spots, setSpots] = useState<Spot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSpots();
   }, []);
 
-  const fetchSpots = async () => {
+  const fetchSpots = async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
 
       // Step 1: Get all users
@@ -121,7 +127,11 @@ export default function Feed() {
       console.error("Error fetching spots:", err);
       setError("Failed to load spots");
     } finally {
-      setLoading(false);
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
@@ -134,10 +144,22 @@ export default function Feed() {
     });
   };
 
+  const onRefresh = () => {
+    fetchSpots(true);
+  };
+
   return (
     <ScrollView
       style={styles.screen}
       contentContainerStyle={{ paddingTop: 60, paddingBottom: 24 }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[COLORS.brand]} // Android
+          tintColor={COLORS.brand} // iOS
+        />
+      }
     >
       {/* Top bar */}
       <View style={styles.topRow}>
@@ -188,7 +210,7 @@ export default function Feed() {
       ) : error ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchSpots}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => fetchSpots()}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -200,9 +222,9 @@ export default function Feed() {
           </Text>
         </View>
       ) : (
-        spots.map((spot: any) => (
+        spots.map((spot: any, index: number) => (
           <SpotCard
-            key={spot.id}
+            key={`${spot.id}-${spot.rankingUser?.userId || index}`}
             spot={spot}
             onPress={handleSpotPress}
             style={styles.spotCard}

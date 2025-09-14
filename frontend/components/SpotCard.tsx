@@ -2,8 +2,10 @@ import { getRatingColor } from "@/utils/ratingColors";
 import { router } from "expo-router";
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
-import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { db } from "../config/firebase";
+import { useAuth } from "../contexts/AuthContext";
+import { rankingsService } from "../services/firestore";
 import { ThemedText } from "./themed-text";
 
 // Types based on the document structure
@@ -68,9 +70,12 @@ export function SpotCard({
   userDisplayName,
   userNotes,
 }: SpotCardProps) {
+  const { user } = useAuth();
   const [resolvedName, setResolvedName] = useState<string | undefined>(
     userDisplayName
   );
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -105,6 +110,22 @@ export function SpotCard({
     };
   }, [rankingUserId, userDisplayName, userName]);
 
+  // Check if spot is bookmarked
+  useEffect(() => {
+    const checkBookmarkStatus = async () => {
+      if (!user || !spot.id) return;
+      
+      try {
+        const bookmarks = await rankingsService.getUserBookmarks(user.uid);
+        setIsBookmarked(bookmarks.includes(spot.id));
+      } catch (error) {
+        console.error('Error checking bookmark status:', error);
+      }
+    };
+
+    checkBookmarkStatus();
+  }, [user, spot.id]);
+
   // Title case helper
   const toTitleCase = (name: string) =>
     name.replace(/\w\S*/g, (txt) => txt[0].toUpperCase() + txt.slice(1).toLowerCase());
@@ -114,6 +135,29 @@ export function SpotCard({
   const goToUser = () => {
     if (!rankingUserId) return;
     router.push(`/user/${encodeURIComponent(rankingUserId)}`);
+  };
+
+  // Bookmark functionality
+  const handleBookmarkToggle = async () => {
+    if (!user || !spot.id) return;
+    
+    // Check if user is trying to bookmark their own spot
+    if (rankingUserId === user.uid) {
+      Alert.alert("Cannot bookmark", "You cannot bookmark your own spots");
+      return;
+    }
+
+    setIsBookmarkLoading(true);
+    
+    try {
+      await rankingsService.toggleBookmark(user.uid, spot.id);
+      setIsBookmarked(!isBookmarked);
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      Alert.alert("Error", "Failed to update bookmark");
+    } finally {
+      setIsBookmarkLoading(false);
+    }
   };
 
 
@@ -168,7 +212,7 @@ export function SpotCard({
           </ThemedText>
         </View>
 
-        {/* Comments and Likes Section */}
+        {/* Comments, Likes, and Bookmarks Section */}
         <View className="social" style={styles.socialSection}>
           <View style={styles.socialItem}>
             <Text style={styles.socialIcon}>💬</Text>
@@ -182,6 +226,18 @@ export function SpotCard({
               {spot.totalRatings || 0} likes
             </ThemedText>
           </View>
+          <Pressable 
+            style={styles.socialItem} 
+            onPress={handleBookmarkToggle}
+            disabled={isBookmarkLoading || rankingUserId === user?.uid}
+          >
+            <Text style={styles.socialIcon}>
+              {isBookmarked ? '🔖' : '📖'}
+            </Text>
+            <ThemedText style={styles.socialText}>
+              {isBookmarked ? 'bookmarked' : 'bookmark'}
+            </ThemedText>
+          </Pressable>
         </View>
       </View>
     </Pressable>

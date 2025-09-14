@@ -24,6 +24,37 @@ interface RankingPopupProps {
   comparisonSpots?: Spot[];
 }
 
+// Map quick category to an initial band (top / middle / bottom third)
+const seedBandFromBucket = (
+  bucket: 'liked' | 'fine' | 'disliked',
+  n: number
+) => {
+  if (n <= 0) return { l: 0, r: -1 };
+  const third = Math.max(1, Math.ceil(n / 3));
+  if (bucket === 'liked')   return { l: 0,        r: Math.min(n - 1, third - 1) };
+  if (bucket === 'fine')    return { l: third,    r: Math.min(n - 1, 2 * third - 1) };
+  // disliked
+  return { l: Math.min(2 * third, n - 1), r: n - 1 };
+};
+
+// Turn insertion index into a 1–10 score (top => ~10, bottom => ~1)
+const indexToScore = (insertAt: number, n: number, maxScore?: number, minScore?: number) => {
+  if (n <= 0) return 5.5;
+  const clamped = Math.max(0, Math.min(insertAt, n)); // insertAt can be n (append)
+  const normalized = 1 + 9 * (1 - clamped / n);
+  let score = Math.round(normalized * 10) / 10;
+  
+  // Apply constraints
+  if (maxScore !== undefined) {
+    score = Math.min(score, maxScore);
+  }
+  if (minScore !== undefined) {
+    score = Math.max(score, minScore);
+  }
+  
+  return score;
+};
+
 export default function RankingPopup({
   visible,
   onClose,
@@ -35,115 +66,137 @@ export default function RankingPopup({
   const [baseRating, setBaseRating] = useState<number | null>(null);
   const [note, setNote] = useState('');
 
-  // Binary search state for ranking insertion
+  // 🔒 Frozen snapshot of the list for this session (prevents mid-flow mutations)
+  const [sessionComparisons, setSessionComparisons] = useState<Spot[]>([]);
+
+  // Binary search state
   const [left, setLeft] = useState(0);
-  const [right, setRight] = useState(comparisonSpots.length - 1);
-  const [currentIndex, setCurrentIndex] = useState(
-    Math.floor(comparisonSpots.length / 2)
-  );
+  const [right, setRight] = useState(-1);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [finalIndex, setFinalIndex] = useState<number | null>(null);
 
-  // Complex scoring system state
+  // Score + UX
   const [refinedRating, setRefinedRating] = useState<number | null>(null);
   const [comparisonCount, setComparisonCount] = useState(0);
+  const [selectedBucket, setSelectedBucket] = useState<'liked' | 'fine' | 'disliked' | null>(null);
+  const [showComparison, setShowComparison] = useState(false);
+  const [maxAllowedScore, setMaxAllowedScore] = useState<number | null>(null);
+  const [minAllowedScore, setMinAllowedScore] = useState<number | null>(null);
 
+  // Guard against rapid double taps during a step
+  const [lockStep, setLockStep] = useState(false);
 
+  // Build frozen, duplicate-free snapshot when modal opens (or spot changes)
   useEffect(() => {
-    if (visible) {
-      setBaseRating(null);
-      setRefinedRating(null);
-      setNote('');
-      setLeft(0);
-      setRight(comparisonSpots.length - 1);
-      setCurrentIndex(Math.floor(comparisonSpots.length / 2));
-      setFinalIndex(null);
-      setComparisonCount(0);
-    }
-  }, [visible, comparisonSpots.length]);
+    if (!visible) return;
 
-  // Complex scoring algorithm
-  const calculateComplexScore = (baseRating: number, comparisonData: any) => {
-    let score = baseRating;
-    
-    // Factor 1: Base rating weight (40%)
-    const baseWeight = 0.4;
-    
-    // Factor 2: Comparison adjustments (30%)
-    const comparisonWeight = 0.3;
-    const comparisonAdjustment = comparisonData.adjustment || 0;
-    
-    // Factor 3: User preference patterns (20%)
-    const preferenceWeight = 0.2;
-    const preferenceBonus = comparisonData.preferenceBonus || 0;
-    
-    // Factor 4: Spot characteristics (10%)
-    const characteristicsWeight = 0.1;
-    const characteristicsBonus = comparisonData.characteristicsBonus || 0;
-    
-    // Calculate weighted score
-    score = (baseRating * baseWeight) + 
-            (comparisonAdjustment * comparisonWeight) + 
-            (preferenceBonus * preferenceWeight) + 
-            (characteristicsBonus * characteristicsWeight);
-    
-    // Apply bounds and rounding
-    return Math.max(1, Math.min(10, Math.round(score * 10) / 10));
-  };
+    const filtered = (comparisonSpots || []).filter(s => s && s.id !== spot?.id);
+    // If you have a user-specific score, you can sort here (desc).
+    // filtered.sort((a,b) => (b.userScore ?? b.averageRating ?? 0) - (a.userScore ?? a.averageRating ?? 0));
+
+    setSessionComparisons(filtered);
+
+    // reset state
+    setBaseRating(null);
+    setSelectedBucket(null);
+    setRefinedRating(null);
+    setNote('');
+    setFinalIndex(null);
+    setComparisonCount(0);
+    setLockStep(false);
+    setShowComparison(false);
+    setMaxAllowedScore(null);
+    setMinAllowedScore(null);
+
+    const n = filtered.length;
+    setLeft(0);
+    setRight(n - 1);
+    setCurrentIndex(Math.floor((0 + Math.max(-1, n - 1)) / 2));
+  }, [visible, spot?.id]); // Removed comparisonSpots from dependencies
 
   const handleRatingPress = (bucket: 'liked' | 'fine' | 'disliked') => {
-    let rating = 5; // Default middle rating
-    
-    switch (bucket) {
-      case 'liked':
-        rating = 8.5; // High rating for liked
-        break;
-      case 'fine':
-        rating = 5.5; // Middle rating for fine
-        break;
-      case 'disliked':
-        rating = 2.5; // Low rating for disliked
-        break;
-    }
-    
+    setSelectedBucket(bucket);
+
+    let rating = 5.5;
+    if (bucket === 'liked') rating = 8.5;
+    if (bucket === 'disliked') rating = 2.5;
+
     setBaseRating(rating);
     setRefinedRating(rating);
+
+    const n = sessionComparisons.length;
+
+    // If no comparisons to make, finalize immediately with the base rating
+    if (n === 0) {
+      setFinalIndex(0);
+      setRefinedRating(rating);
+      return;
+    }
+
+    // Don't automatically show comparison - let user see their selection
+    // The comparison will only show when user is ready (we'll add a "Continue" button)
   };
 
   const handleComparison = (preferred: 'new' | 'existing') => {
+    if (lockStep) return; // prevent double taps in the same frame
     if (finalIndex !== null || baseRating === null) return;
-  
-    const currentComparison = comparisonSpots[currentIndex];
-    if (!currentComparison) return;
-  
+
+    const n = sessionComparisons.length;
+    if (n === 0) return; // nothing to compare
+
+    const current = sessionComparisons[currentIndex];
+    if (!current) return;
+
+    setLockStep(true);
     setComparisonCount(prev => prev + 1);
-  
-    // Update binary search bounds
+
+    // Narrow the search
     let nextLeft = left;
     let nextRight = right;
-  
+
     if (preferred === 'new') {
-      nextRight = currentIndex - 1;
+      nextRight = currentIndex - 1;   // new is better → go left side
     } else {
-      nextLeft = currentIndex + 1;
+      nextLeft = currentIndex + 1;    // existing is better → go right side
     }
-  
-    if (nextLeft > nextRight) {
-      // Final insertion index found
-      const insertAt = preferred === 'new' ? currentIndex : currentIndex + 1;
+
+    // Update refined rating live based on current position
+    const currentInsertAt = preferred === 'new' ? currentIndex : currentIndex + 1;
+    const liveRating = indexToScore(currentInsertAt, n, maxAllowedScore || undefined, minAllowedScore || undefined);
+    setRefinedRating(liveRating);
+
+    // Set constraints based on user preference
+    const currentSpotScore = sessionComparisons[currentIndex]?.averageRating || 0;
+    if (currentSpotScore > 0) {
+      if (preferred === 'new') {
+        // New spot is better than current existing spot
+        // Set minimum constraint: new spot should be at least as good as current
+        setMinAllowedScore(Math.max(minAllowedScore || 0, currentSpotScore + 0.1));
+      } else if (preferred === 'existing') {
+        // New spot is worse than current existing spot
+        // Set maximum constraint: new spot should be worse than current
+        setMaxAllowedScore(Math.min(maxAllowedScore || 10, currentSpotScore - 0.1));
+      }
+    }
+
+    // Only finalize if we've made at least 2 comparisons OR the search space is very small
+    const shouldFinalize = comparisonCount >= 1 || (nextLeft > nextRight);
+    
+    if (shouldFinalize) {
+      // Robust insertion rule: insert at `nextLeft`
+      const insertAt = Math.max(0, Math.min(nextLeft, n));
       setFinalIndex(insertAt);
-  
-      // 🔑 Convert index into normalized score (1–10)
-      const normalized =
-        1 + 9 * (1 - insertAt / Math.max(1, comparisonSpots.length));
-      setRefinedRating(Math.round(normalized * 10) / 10);
+      setRefinedRating(indexToScore(insertAt, n, maxAllowedScore || undefined, minAllowedScore || undefined));
+      setLockStep(false);
     } else {
-      // Keep narrowing search
-      setCurrentIndex(Math.floor((nextLeft + nextRight) / 2));
+      const mid = Math.floor((nextLeft + nextRight) / 2);
       setLeft(nextLeft);
       setRight(nextRight);
+      setCurrentIndex(mid);
+      // Briefly lock to avoid multi-press races
+      setTimeout(() => setLockStep(false), 200);
     }
   };
-  
 
   const handleSubmit = async () => {
     if (baseRating === null) {
@@ -151,24 +204,36 @@ export default function RankingPopup({
       return;
     }
     if (!spot) return;
-  
+
     try {
-      // If binary search finished, use refined normalized rating
-      const finalRating = refinedRating || baseRating;
-  
-      const rankedList = [...comparisonSpots];
-      const insertAt = finalIndex ?? rankedList.length;
-  
-      // Insert new spot into correct position
-      rankedList.splice(insertAt, 0, spot);
-  
+      const n = sessionComparisons.length;
+
+      // If user never compared (e.g., band was empty or they backed out),
+      // finalize at current left as a safe default insertion.
+      let insertAt = finalIndex;
+      if (insertAt === null) {
+        // Clamp to [0, n]
+        insertAt = Math.max(0, Math.min(left, n));
+      }
+
+      // Compute final numeric rating:
+      // - If we've got a final index → normalized 1–10 from placement
+      // - Else fall back to the base rating
+      const finalRating = insertAt !== null
+        ? indexToScore(insertAt, n, maxAllowedScore || undefined, minAllowedScore || undefined)
+        : baseRating;
+
+      // Build the new ranked list in-place relative to the frozen snapshot
+      const rankedList = [...sessionComparisons];
+      const safeInsert = Math.max(0, Math.min(insertAt ?? n, n));
+      rankedList.splice(safeInsert, 0, spot);
+
       await onSubmit(finalRating, note, rankedList);
       onClose();
     } catch (error) {
       console.error('Error submitting ranking:', error);
     }
   };
-  
 
   const handleClose = () => {
     setBaseRating(null);
@@ -176,6 +241,10 @@ export default function RankingPopup({
     setNote('');
     setFinalIndex(null);
     setComparisonCount(0);
+    setLockStep(false);
+    setShowComparison(false);
+    setMaxAllowedScore(null);
+    setMinAllowedScore(null);
     onClose();
   };
 
@@ -237,7 +306,7 @@ export default function RankingPopup({
                   </TouchableOpacity>
                 ))}
               </View>
-              
+
               {/* Show refined rating */}
               {refinedRating !== null && (
                 <View style={[styles.ratingDisplay, { backgroundColor: getRatingBackgroundColor(refinedRating) }]}>
@@ -249,10 +318,37 @@ export default function RankingPopup({
                   </View>
                 </View>
               )}
+
+              {/* Continue button - only show if we have comparisons and haven't started them yet */}
+              {sessionComparisons.length > 0 && baseRating !== null && !showComparison && (
+                <View style={styles.continueSection}>
+                  <TouchableOpacity
+                    style={[styles.continueButton, { backgroundColor: getRatingColor(refinedRating || baseRating) }]}
+                    onPress={() => {
+                      setShowComparison(true);
+                      // Seed the comparison window
+                      const { l, r } = seedBandFromBucket(selectedBucket!, sessionComparisons.length);
+                      setLeft(l);
+                      setRight(r);
+                      setCurrentIndex(Math.floor((l + r) / 2));
+                      
+                      // If the band is empty, finalize immediately
+                      if (l > r) {
+                        setFinalIndex(l);
+                        setRefinedRating(indexToScore(l, sessionComparisons.length, maxAllowedScore || undefined, minAllowedScore || undefined));
+                      }
+                    }}
+                  >
+                    <ThemedText style={styles.continueButtonText}>
+                      Continue to Comparisons
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             {/* Comparison Section */}
-            {comparisonSpots.length > 0 && baseRating !== null && finalIndex === null && (
+            {sessionComparisons.length > 0 && baseRating !== null && showComparison && finalIndex === null && (
               <View style={styles.comparisonSection}>
                 <ThemedText style={styles.sectionTitle}>Which do you prefer?</ThemedText>
                 <ThemedText style={styles.comparisonSubtitle}>
@@ -281,17 +377,17 @@ export default function RankingPopup({
                     onPress={() => handleComparison('existing')}
                   >
                     <ThemedText style={styles.comparisonName}>
-                      {comparisonSpots[currentIndex]?.name || 'Another Spot'}
+                      {sessionComparisons[currentIndex]?.name || 'Another Spot'}
                     </ThemedText>
                     <ThemedText style={styles.comparisonScore}>
-                      {comparisonSpots[currentIndex]?.averageRating?.toFixed(1) || 'N/A'}
+                      {sessionComparisons[currentIndex]?.averageRating?.toFixed(1) || 'N/A'}
                     </ThemedText>
                     <ThemedText style={styles.comparisonSubtext}>
                       Your experience
                     </ThemedText>
                   </TouchableOpacity>
                 </View>
-                
+
                 {/* Progress indicator */}
                 {comparisonCount > 0 && (
                   <View style={styles.progressContainer}>
@@ -458,6 +554,25 @@ const styles = StyleSheet.create({
   ratingValue: {
     fontSize: 20,
     fontWeight: '700'
+  },
+  continueSection: {
+    paddingHorizontal: 20,
+    paddingTop: 16
+  },
+  continueButton: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3
+  },
+  continueButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16
   },
   comparisonSection: { 
     paddingHorizontal: 20,

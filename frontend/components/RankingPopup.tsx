@@ -285,7 +285,6 @@ export default function RankingPopup({
   
             {/* Comparison Section */}
             {sessionComparisons.length > 0 &&
-              baseRating !== null &&
               finalIndex === null && (
                 <View style={styles.comparisonSection}>
                   <ThemedText style={styles.sectionTitle}>
@@ -297,25 +296,51 @@ export default function RankingPopup({
   
                   <View style={styles.comparisonContainer}>
                     <TouchableOpacity
-                      style={[styles.comparisonCard, styles.comparisonChoice]}
-                      onPress={() => handleComparison('new')}
+                      style={[
+                        styles.comparisonCard, 
+                        styles.comparisonChoice,
+                        baseRating === null && styles.comparisonCardDisabled
+                      ]}
+                      onPress={() => baseRating !== null && handleComparison('new')}
+                      disabled={baseRating === null}
                     >
-                      <ThemedText style={styles.comparisonName}>
+                      <ThemedText style={[
+                        styles.comparisonName,
+                        baseRating === null && styles.comparisonTextDisabled
+                      ]}>
                         {spot.name}
                       </ThemedText>
-                      <ThemedText style={styles.comparisonSubtext}>This one</ThemedText>
+                      <ThemedText style={[
+                        styles.comparisonSubtext,
+                        baseRating === null && styles.comparisonTextDisabled
+                      ]}>
+                        {baseRating === null ? 'Select rating first' : 'This one'}
+                      </ThemedText>
                     </TouchableOpacity>
-  
+
                     <ThemedText style={styles.vsText}>vs</ThemedText>
-  
+
                     <TouchableOpacity
-                      style={[styles.comparisonCard, styles.comparisonChoice]}
-                      onPress={() => handleComparison('existing')}
+                      style={[
+                        styles.comparisonCard, 
+                        styles.comparisonChoice,
+                        baseRating === null && styles.comparisonCardDisabled
+                      ]}
+                      onPress={() => baseRating !== null && handleComparison('existing')}
+                      disabled={baseRating === null}
                     >
-                      <ThemedText style={styles.comparisonName}>
+                      <ThemedText style={[
+                        styles.comparisonName,
+                        baseRating === null && styles.comparisonTextDisabled
+                      ]}>
                         {sessionComparisons[currentIndex]?.name || 'Another Spot'}
                       </ThemedText>
-                      <ThemedText style={styles.comparisonSubtext}>That one</ThemedText>
+                      <ThemedText style={[
+                        styles.comparisonSubtext,
+                        baseRating === null && styles.comparisonTextDisabled
+                      ]}>
+                        {baseRating === null ? 'Select rating first' : 'That one'}
+                      </ThemedText>
                     </TouchableOpacity>
                   </View>
   
@@ -682,5 +707,13 @@ const styles = StyleSheet.create({
     height: 8,
     backgroundColor: '#10B981',
     borderRadius: 4,
+  },
+  comparisonCardDisabled: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#D1D5DB',
+    opacity: 0.6,
+  },
+  comparisonTextDisabled: {
+    color: '#9CA3AF',
   },
 });

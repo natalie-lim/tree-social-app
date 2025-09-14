@@ -20,7 +20,6 @@ import { userService } from "../../services/natureApp";
 
 type Stat = { label: string; value: string | number };
 type ListRowProps = {
-  icon?: string;
   label: string;
   value?: string | number;
   onPress?: () => void;
@@ -64,10 +63,9 @@ const StatItem = ({ label, value }: Stat) => (
   </View>
 );
 
-const ListRow = ({ icon = "✓", label, value, onPress }: ListRowProps) => (
+const ListRow = ({ label, value, onPress }: ListRowProps) => (
   <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.row}>
     <View style={styles.rowLeft}>
-      <Text style={styles.rowIcon}>{icon}</Text>
       <Text style={styles.rowLabel}>{label}</Text>
     </View>
     <View style={styles.rowRight}>
@@ -531,7 +529,6 @@ export default function Profile() {
           {/* Lists */}
           <View style={styles.section}>
             <ListRow
-              icon="✔︎"
               label="Been"
               value={userProfile?.totalRankings || 0}
               onPress={() => {
@@ -548,13 +545,12 @@ export default function Profile() {
             />
             <View style={styles.divider} />
             <ListRow
-              icon="⭐"
               label="Reviews"
               value={userProfile?.totalReviews || 0}
             />
             <View style={styles.divider} />
             <ListRow
-              icon="🏆"
+
               label="Average Rating"
               value={
                 userProfile?.averageRating

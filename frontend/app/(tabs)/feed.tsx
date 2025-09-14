@@ -1,8 +1,10 @@
 // app/(tabs)/feed.tsx
-import { ActivityFeed } from "@/components/ActivityFeed";
+import { Spot, SpotCard } from "@/components/SpotCard";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { firestoreService } from "../../services/firestore";
 
 const COLORS = {
   bg: "#FFF6EC", // soft cream
@@ -23,6 +26,96 @@ const COLORS = {
 };
 
 export default function Feed() {
+  const [spots, setSpots] = useState<Spot[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchSpots();
+  }, []);
+
+  const fetchSpots = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Step 1: Get all users
+      const users = await firestoreService.getAll("users");
+      console.log("Fetched users:", users.length);
+
+      // Step 2: Get all rankings from users (rankings is an array field in each user document)
+      const allRankings = [];
+      for (const user of users) {
+        try {
+          // Access rankings array directly from user document
+          const userWithRankings = user as any; // Type assertion to access rankings property
+          if (
+            userWithRankings.rankings &&
+            Array.isArray(userWithRankings.rankings)
+          ) {
+            console.log(
+              `User ${user.id} has ${userWithRankings.rankings.length} rankings:`,
+              userWithRankings.rankings
+            );
+            allRankings.push(...userWithRankings.rankings);
+          } else {
+            console.log(
+              `User ${user.id} has no rankings or rankings is not an array`
+            );
+          }
+        } catch (err) {
+          console.log(
+            `Error accessing rankings for user ${user.id}:`,
+            err instanceof Error ? err.message : String(err)
+          );
+        }
+      }
+      console.log("Total rankings found:", allRankings.length);
+
+      // Step 3: Extract unique spotIds from rankings
+      console.log("Sample ranking structure:", allRankings[0]); // Debug: see the actual structure
+      const spotIds = [
+        ...new Set(
+          allRankings
+            .map((ranking: any) => {
+              // Try different possible nested structures for spotId
+              const spotId =
+                ranking.spotId ||
+                ranking.data?.spotId ||
+                ranking.spot?.id ||
+                ranking.spotId ||
+                ranking.spotId;
+              console.log(`Extracted spotId from ranking:`, spotId); // Debug: see what we extracted
+              return spotId;
+            })
+            .filter(Boolean)
+        ),
+      ];
+
+      // Step 4: Get all spots and match by name
+      const allSpots = await firestoreService.getAll("spots");
+
+      // Step 5: Filter spots that match the spotIds from rankings
+      const matchedSpots = allSpots.filter((spot) => spotIds.includes(spot.id));
+
+      setSpots(matchedSpots as Spot[]);
+    } catch (err) {
+      console.error("Error fetching spots:", err);
+      setError("Failed to load spots");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSpotPress = (spot: Spot) => {
+    router.push({
+      pathname: "/spot-detail",
+      params: {
+        spotData: JSON.stringify(spot),
+      },
+    });
+  };
+
   return (
     <ScrollView
       style={styles.screen}
@@ -74,63 +167,38 @@ export default function Feed() {
         />
       </View>
 
-      {/* Activity Feed */}
-      <View style={styles.feedContainer}>
-        <Text style={styles.sectionTitle}>Your Feed</Text>
-        <ActivityFeed
-          onActivityPress={(activity) => {
-            // Navigate to spot detail
-            router.push({
-              pathname: "/spot-detail",
-              params: {
-                spotData: JSON.stringify({
-                  id: activity.spotId,
-                  name: activity.spotName,
-                  description: activity.note || "No description available",
-                  category: "parks_nature",
-                  location: {
-                    address: activity.spotLocation,
-                    coordinates: {
-                      latitude: 0,
-                      longitude: 0,
-                    },
-                  },
-                  photos: activity.spotImage
-                    ? [
-                        {
-                          url: activity.spotImage,
-                          caption: activity.spotName,
-                          credit: "User Upload",
-                        },
-                      ]
-                    : [],
-                  amenities: [],
-                  averageRating: activity.rating || 0,
-                  reviewCount: 0,
-                  totalRatings: 0,
-                  bestTimeToVisit: [],
-                  difficulty: "varies",
-                  distance: "",
-                  duration: "",
-                  elevation: "",
-                  isVerified: false,
-                  npsCode: "",
-                  website: "",
-                  tags: [],
-                  createdAt: activity.createdAt || new Date(),
-                  createdBy: activity.userId,
-                  source: "USER_ADDED",
-                  updatedAt: activity.createdAt || new Date(),
-                }),
-              },
-            });
-          }}
-          onCommentPress={(activityId) => {
-            // Navigate to comments
-            console.log("Comment pressed:", activityId);
-          }}
-        />
-      </View>
+      {/* Feed content */}
+      <Text style={styles.sectionTitle}>Discover Spots</Text>
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.brand} />
+          <Text style={styles.loadingText}>Loading spots...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchSpots}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : spots.length === 0 ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>No spots found</Text>
+          <Text style={styles.cardSub}>
+            Be the first to add a spot to your area!
+          </Text>
+        </View>
+      ) : (
+        spots.map((spot) => (
+          <SpotCard
+            key={spot.id}
+            spot={spot}
+            onPress={handleSpotPress}
+            style={styles.spotCard}
+          />
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -235,8 +303,43 @@ const styles = StyleSheet.create({
     marginTop: 6,
     color: COLORS.sub,
   },
-  feedContainer: {
+  spotCard: {
+    marginBottom: 16,
+  },
+  loadingContainer: {
     flex: 1,
-    marginTop: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: COLORS.sub,
+  },
+  errorContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: "center",
+  },
+  errorText: {
+    fontSize: 16,
+    color: COLORS.sub,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: COLORS.chip,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: COLORS.chipText,
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

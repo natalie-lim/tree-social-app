@@ -1,7 +1,6 @@
 // app/map.tsx
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Image,
   StyleSheet,
   Text,
@@ -12,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useNavigation } from "expo-router";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import { CuteLoading } from "@/components/CuteLoading";
 
 import { collection, onSnapshot } from "firebase/firestore";
 import { Spot } from "../components/SpotCard";
@@ -140,7 +140,7 @@ export default function MapScreen() {
       {/* Map / Loader */}
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator />
+          <CuteLoading message="Loading map..." size="large" />
         </View>
       ) : (
         <MapView

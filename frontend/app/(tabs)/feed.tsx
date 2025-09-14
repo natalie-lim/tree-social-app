@@ -57,7 +57,22 @@ export default function Feed() {
               `User ${user.id} has ${userWithRankings.rankings.length} rankings:`,
               userWithRankings.rankings
             );
-            allRankings.push(...userWithRankings.rankings);
+            // Add user info to each ranking
+            const rankingsWithUser = userWithRankings.rankings.map(
+              (ranking: any) => ({
+                ...ranking,
+                userId: user.id,
+                userName:
+                  userWithRankings.displayName ||
+                  userWithRankings.email ||
+                  "User",
+                userDisplayName:
+                  userWithRankings.displayName ||
+                  userWithRankings.email ||
+                  "User",
+              })
+            );
+            allRankings.push(...rankingsWithUser);
           } else {
             console.log(
               `User ${user.id} has no rankings or rankings is not an array`
@@ -95,10 +110,27 @@ export default function Feed() {
       // Step 4: Get all spots and match by name
       const allSpots = await firestoreService.getAll("spots");
 
-      // Step 5: Filter spots that match the spotIds from rankings
-      const matchedSpots = allSpots.filter((spot) => spotIds.includes(spot.id));
+      // Step 5: Create spots with user information
+      const spotsWithUsers = [];
+      for (const ranking of allRankings) {
+        const spotId =
+          ranking.spotId || ranking.data?.spotId || ranking.spot?.id;
+        if (spotId) {
+          const matchingSpot = allSpots.find((spot) => spot.id === spotId);
+          if (matchingSpot) {
+            spotsWithUsers.push({
+              ...matchingSpot,
+              rankingUser: {
+                userId: ranking.userId,
+                userName: ranking.userName,
+                userDisplayName: ranking.userDisplayName,
+              },
+            });
+          }
+        }
+      }
 
-      setSpots(matchedSpots as Spot[]);
+      setSpots(spotsWithUsers as any[]);
     } catch (err) {
       console.error("Error fetching spots:", err);
       setError("Failed to load spots");
@@ -190,12 +222,14 @@ export default function Feed() {
           </Text>
         </View>
       ) : (
-        spots.map((spot) => (
+        spots.map((spot: any) => (
           <SpotCard
             key={spot.id}
             spot={spot}
             onPress={handleSpotPress}
             style={styles.spotCard}
+            userName={spot.rankingUser?.userName}
+            userDisplayName={spot.rankingUser?.userDisplayName}
           />
         ))
       )}

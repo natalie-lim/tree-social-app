@@ -1,12 +1,6 @@
-import React from 'react';
-import {
-    Dimensions,
-    Pressable,
-    StyleSheet,
-    Text,
-    View
-} from 'react-native';
-import { ThemedText } from './themed-text';
+import React from "react";
+import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import { ThemedText } from "./themed-text";
 
 // Types based on the document structure
 export interface SpotPhoto {
@@ -53,18 +47,23 @@ interface SpotCardProps {
   spot: Spot;
   onPress?: (spot: Spot) => void;
   style?: any;
+  userName?: string;
+  userDisplayName?: string;
 }
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
-export function SpotCard({ spot, onPress, style }: SpotCardProps) {
-  const accentColor = '#6FA076'; // Your app's accent color
+export function SpotCard({
+  spot,
+  onPress,
+  style,
+  userName,
+  userDisplayName,
+}: SpotCardProps) {
+  const accentColor = "#6FA076"; // Your app's accent color
 
   return (
-    <Pressable 
-      style={[styles.card, style]} 
-      onPress={() => onPress?.(spot)}
-    >
+    <Pressable style={[styles.card, style]} onPress={() => onPress?.(spot)}>
       <View style={styles.cardContent}>
         {/* Main Row */}
         <View style={styles.mainRow}>
@@ -77,20 +76,32 @@ export function SpotCard({ spot, onPress, style }: SpotCardProps) {
               {spot.location.address}
             </ThemedText>
           </View>
-          
+
           {/* Right side - Rating circle */}
           {spot.averageRating > 0 && (
             <View style={styles.ratingCircle}>
-              <Text style={styles.ratingText}>{spot.averageRating.toFixed(1)}</Text>
+              <Text style={styles.ratingText}>
+                {spot.averageRating.toFixed(1)}
+              </Text>
             </View>
           )}
         </View>
+
+        {/* User Section */}
+        {(userName || userDisplayName) && (
+          <View style={styles.userSection}>
+            <Text style={styles.userIcon}>👤</Text>
+            <ThemedText style={styles.userText}>
+              {userDisplayName || userName || "User"}'s ranking
+            </ThemedText>
+          </View>
+        )}
 
         {/* User Notes Section */}
         <View style={styles.notesSection}>
           <ThemedText style={styles.notesLabel}>Your Notes:</ThemedText>
           <ThemedText style={styles.notesText}>
-            {spot.description || 'No notes added yet'}
+            {spot.description || "No notes added yet"}
           </ThemedText>
         </View>
 
@@ -98,11 +109,15 @@ export function SpotCard({ spot, onPress, style }: SpotCardProps) {
         <View style={styles.socialSection}>
           <View style={styles.socialItem}>
             <Text style={styles.socialIcon}>💬</Text>
-            <ThemedText style={styles.socialText}>{spot.reviewCount || 0} comments</ThemedText>
+            <ThemedText style={styles.socialText}>
+              {spot.reviewCount || 0} comments
+            </ThemedText>
           </View>
           <View style={styles.socialItem}>
             <Text style={styles.socialIcon}>❤️</Text>
-            <ThemedText style={styles.socialText}>{spot.totalRatings || 0} likes</ThemedText>
+            <ThemedText style={styles.socialText}>
+              {spot.totalRatings || 0} likes
+            </ThemedText>
           </View>
         </View>
       </View>
@@ -114,23 +129,23 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: 12,
     borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
+    overflow: "hidden",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
   },
   cardContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     padding: 16,
   },
-  
+
   // Main row with spot info and rating
   mainRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 12,
   },
   spotInfo: {
@@ -139,26 +154,46 @@ const styles = StyleSheet.create({
   },
   spotName: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: "700",
+    color: "#111827",
     marginBottom: 4,
   },
   spotLocation: {
     fontSize: 14,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   ratingCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#6FA076',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#6FA076",
+    alignItems: "center",
+    justifyContent: "center",
   },
   ratingText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
+  },
+
+  // User section
+  userSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: "#F0F9FF",
+    borderRadius: 6,
+  },
+  userIcon: {
+    fontSize: 12,
+    marginRight: 6,
+  },
+  userText: {
+    fontSize: 12,
+    color: "#0369A1",
+    fontWeight: "600",
   },
 
   // Notes section
@@ -166,32 +201,32 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: "#F8F9FA",
     borderRadius: 8,
   },
   notesLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
+    fontWeight: "600",
+    color: "#6B7280",
     marginBottom: 4,
   },
   notesText: {
     fontSize: 14,
-    color: '#374151',
-    fontStyle: 'italic',
+    color: "#374151",
+    fontStyle: "italic",
   },
 
   // Social section
   socialSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: "#E5E7EB",
   },
   socialItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   socialIcon: {
     fontSize: 14,
@@ -199,7 +234,7 @@ const styles = StyleSheet.create({
   },
   socialText: {
     fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
+    color: "#6B7280",
+    fontWeight: "500",
   },
 });

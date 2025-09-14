@@ -2,33 +2,39 @@
 import { SlimUnrankedCard } from "@/components/SlimUnrankedCard";
 import { Spot } from "@/components/SpotCard";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { router, useNavigation } from "expo-router";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
 import { firestoreService, rankingsService } from "../services/firestore";
 
 const COLORS = {
-  bg: "#FFF6EC", // soft cream
-  brand: "#2F4A43", // deep green (logo / active)
-  chip: "#1F5B4E", // dark teal for buttons
+  bg: "#F7F1E8", // creamy beige to match other screens
+  brand: "#2F4A43",
+  chip: "#1F5B4E",
   chipText: "#FFFFFF",
   text: "#222326",
-  sub: "#3E3E3E",
+  sub: "#6F7B6F",
   inputBg: "#F2F4F5",
   border: "#E3E6E8",
 };
 
 export default function Bookmarks() {
+  const navigation = useNavigation();
+  useLayoutEffect(() => {
+    // Hide the native stack header so only our beige header shows
+    navigation.setOptions({ headerShown: false } as any);
+  }, [navigation]);
+
   const { user } = useAuth();
   const [bookmarkedSpots, setBookmarkedSpots] = useState<Spot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,65 +51,43 @@ export default function Bookmarks() {
       setLoading(false);
       return;
     }
-
     try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+      isRefresh ? setRefreshing(true) : setLoading(true);
       setError(null);
 
-      // Get user's bookmarks
       const bookmarkIds = await rankingsService.getUserBookmarks(user.uid);
-
       if (bookmarkIds.length === 0) {
         setBookmarkedSpots([]);
         return;
       }
 
-      // Fetch all bookmarked spots
-      const spots = [];
+      const spots: Spot[] = [];
       for (const spotId of bookmarkIds) {
         try {
-          const spot = await firestoreService.read('spots', spotId);
-          if (spot) {
-            spots.push(spot as Spot);
-          }
+          const spot = await firestoreService.read("spots", spotId);
+          if (spot) spots.push(spot as Spot);
         } catch (err) {
           console.warn(`Could not fetch spot ${spotId}:`, err);
         }
       }
-
       setBookmarkedSpots(spots);
     } catch (err) {
       console.error("Error fetching bookmarks:", err);
       setError("Failed to load bookmarks");
     } finally {
-      if (isRefresh) {
-        setRefreshing(false);
-      } else {
-        setLoading(false);
-      }
+      isRefresh ? setRefreshing(false) : setLoading(false);
     }
   };
 
   const handleSpotPress = (spot: Spot) => {
     router.push({
       pathname: "/spot-detail",
-      params: {
-        spotData: JSON.stringify(spot),
-      },
+      params: { spotData: JSON.stringify(spot) },
     });
   };
 
-  const onRefresh = () => {
-    fetchBookmarks(true);
-  };
-
-  const handleBackPress = () => {
-    router.back();
-  };
+  const onRefresh = () => fetchBookmarks(true);
+  const handleBackPress = () => router.back();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -114,15 +98,15 @@ export default function Bookmarks() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={[COLORS.brand]} // Android
-            tintColor={COLORS.brand} // iOS
+            colors={[COLORS.brand]}
+            tintColor={COLORS.brand}
           />
         }
       >
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.brand} />
+            <Ionicons name="arrow-back" size={22} color={COLORS.brand} />
           </TouchableOpacity>
           <Text style={styles.title}>Bookmarks</Text>
           <View style={styles.placeholder} />
@@ -151,7 +135,7 @@ export default function Bookmarks() {
           </View>
         ) : (
           <View style={styles.spotsContainer}>
-            {bookmarkedSpots.map((spot: Spot) => (
+            {bookmarkedSpots.map((spot) => (
               <SlimUnrankedCard
                 key={spot.id}
                 spot={spot}
@@ -167,14 +151,8 @@ export default function Bookmarks() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  screen: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  screen: { flex: 1, paddingHorizontal: 16 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -182,28 +160,13 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     marginBottom: 8,
   },
-  backButton: {
-    padding: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: COLORS.brand,
-  },
-  placeholder: {
-    width: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 40,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: COLORS.sub,
-  },
+  backButton: { padding: 8 },
+  title: { fontSize: 24, fontWeight: "800", color: COLORS.brand },
+  placeholder: { width: 40 },
+
+  loadingContainer: { justifyContent: "center", alignItems: "center", paddingVertical: 40 },
+  loadingText: { marginTop: 12, fontSize: 16, color: COLORS.sub },
+
   errorContainer: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -213,47 +176,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 20,
   },
-  errorText: {
-    fontSize: 16,
-    color: COLORS.sub,
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: COLORS.chip,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: COLORS.chipText,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 60,
-    paddingHorizontal: 40,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: COLORS.text,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 16,
-    color: COLORS.sub,
-    textAlign: "center",
-    lineHeight: 22,
-  },
-  spotsContainer: {
-    marginTop: 8,
-  },
-  spotCard: {
-    marginBottom: 8,
-  },
+  errorText: { fontSize: 16, color: COLORS.sub, textAlign: "center", marginBottom: 16 },
+  retryButton: { backgroundColor: COLORS.chip, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
+  retryButtonText: { color: COLORS.chipText, fontSize: 16, fontWeight: "600" },
+
+  emptyContainer: { justifyContent: "center", alignItems: "center", paddingVertical: 60, paddingHorizontal: 40 },
+  emptyTitle: { fontSize: 20, fontWeight: "700", color: COLORS.text, marginTop: 16, marginBottom: 8 },
+  emptySubtext: { fontSize: 16, color: COLORS.sub, textAlign: "center", lineHeight: 22 },
+
+  spotsContainer: { marginTop: 8 },
+  spotCard: { marginBottom: 8 },
 });

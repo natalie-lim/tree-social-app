@@ -42,7 +42,7 @@ export default function Feed() {
 
       {/* Pills row */}
       <View style={styles.pillsRow}>
-        <Pill icon="calendar-outline" label="Add Place" onPress={() => router.push('/add-place')} />
+        <Pill icon="calendar-outline" label="Add Place" onPress={() => router.push("/add-place")} />
         <Pill icon="navigate-outline" label="Open Map" onPress={() => router.push("/map")} />
       </View>
 

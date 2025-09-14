@@ -3,6 +3,7 @@ import { Spot, SpotCard } from "@/components/SpotCard";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
+import { CuteLoading } from "@/components/CuteLoading";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -203,9 +204,8 @@ export default function Feed() {
       )}
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.brand} />
-          <Text style={styles.loadingText}>Loading spots...</Text>
+        <View style={styles.loadingWrap}>
+          <CuteLoading message="Loading spots..." size="large" />
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
@@ -392,5 +392,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.brand,
     fontWeight: "500",
+  },
+    loadingWrap: {
+    minHeight: 260,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

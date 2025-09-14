@@ -388,9 +388,7 @@ export default function Profile() {
 
   if (authLoading || profileLoading) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <CuteLoading message="Loading your profile..." size="medium" showMessage />
-      </SafeAreaView>
+        <CuteLoading message="Loading your profile..." size="large" showMessage />
     );
   }
 

@@ -11,6 +11,8 @@ import {
   View,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
+import { CuteLoading } from "@/components/CuteLoading";
+
 import { Spot } from "../../components/SpotCard";
 import { db } from "../../config/firebase";
 
@@ -162,7 +164,7 @@ export default function MapScreen() {
     <View style={styles.screen}>
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator />
+          <CuteLoading message="Loading map..." size="large" />
         </View>
       ) : (
         <MapView

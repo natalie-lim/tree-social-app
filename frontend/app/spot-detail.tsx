@@ -1,15 +1,17 @@
 import { Spot } from '@/components/SpotCard';
 import { ThemedText } from '@/components/themed-text';
+import { auth } from '@/config/firebase';
+import { rankingsService } from '@/services/firestore';
 import { router, useLocalSearchParams } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    Dimensions,
-    Image,
-    Linking,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    View,
+  Dimensions,
+  Image,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -20,6 +22,11 @@ export default function SpotDetailPage() {
   
   // Parse the spot data from the navigation params
   const spot: Spot = spotData ? JSON.parse(spotData as string) : null;
+  
+  // State for ranking status
+  const [isRanked, setIsRanked] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [userRating, setUserRating] = useState<number | null>(null);
 
   if (!spot) {
     return (
@@ -81,13 +88,90 @@ export default function SpotDetailPage() {
     router.back();
   };
 
+  // Check if user has ranked this spot
+  useEffect(() => {
+    const checkRankingStatus = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser || !spot) {
+          setIsLoading(false);
+          return;
+        }
+
+        // Check if user has a ranking for this spot
+        const ranking = await rankingsService.getUserRankingForSpot(currentUser.uid, spot.id);
+
+        if (ranking) {
+          setIsRanked(true);
+          setUserRating((ranking as any).rating);
+        } else {
+          setIsRanked(false);
+          setUserRating(null);
+        }
+      } catch (error) {
+        console.error('Error checking ranking status:', error);
+        setIsRanked(false);
+        setUserRating(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkRankingStatus();
+  }, [spot]);
+
+  const handleRankingPress = () => {
+    if (isRanked) {
+      // Already ranked - could show rating details or allow editing
+      console.log('Spot already ranked with rating:', userRating);
+    } else {
+      // Navigate to ranking page
+      console.log('=== SPOT DETAIL DEBUG ===');
+      console.log('Spot object:', spot);
+      console.log('Spot ID:', spot?.id);
+      console.log('Spot name:', spot?.name);
+      console.log('Spot location:', spot?.location);
+      console.log('Serialized spot data:', JSON.stringify(spot));
+      
+      try {
+        router.push({
+          pathname: '/ranking',
+          params: {
+            spotData: JSON.stringify(spot)
+          }
+        });
+      } catch (error) {
+        console.error('Navigation error:', error);
+        // Fallback navigation
+        router.push('/ranking');
+      }
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        {/* Header with back button */}
+        {/* Header with back button and ranking button */}
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={handleBackPress}>
             <ThemedText style={styles.backButtonText}>← Back</ThemedText>
+          </Pressable>
+          
+          {/* Ranking Button */}
+          <Pressable 
+            style={[
+              styles.rankingButton,
+              isRanked && styles.rankingButtonRanked
+            ]} 
+            onPress={handleRankingPress}
+            disabled={isLoading}
+          >
+            <ThemedText style={[
+              styles.rankingButtonText,
+              isRanked && styles.rankingButtonTextRanked
+            ]}>
+              {isLoading ? '...' : isRanked ? (userRating ? userRating : '✓') : '+'}
+            </ThemedText>
           </Pressable>
         </View>
 
@@ -529,5 +613,31 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 18,
     color: '#6B7280',
+  },
+  
+  // Ranking Button Styles
+  rankingButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#6FA076',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  rankingButtonRanked: {
+    backgroundColor: '#4CAF50',
+  },
+  rankingButtonText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  rankingButtonTextRanked: {
+    fontSize: 18,
   },
 });

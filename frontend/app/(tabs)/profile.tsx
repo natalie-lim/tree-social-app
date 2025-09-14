@@ -1,4 +1,7 @@
 // Profile.tsx
+import { RankedCard, UserRanking } from "@/components/RankedCard";
+import { ThemedText } from "@/components/themed-text";
+import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -11,10 +14,28 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "../../contexts/AuthContext";
+import { firestoreService } from "../../services/firestore";
 import { userService } from "../../services/natureApp";
 
 type Stat = { label: string; value: string | number };
 type ListRowProps = { icon?: string; label: string; value?: string | number; onPress?: () => void };
+
+interface UserProfile {
+  id: string;
+  displayName: string;
+  email: string;
+  profilePhoto?: string;
+  photoURL?: string;
+  joinedAt: any;
+  followerCount: number;
+  followingCount: number;
+  totalSpots: number;
+  totalReviews: number;
+  averageRating: number;
+  rankings?: UserRanking[];
+  totalRankings?: number;
+}
+
 
 const PALETTE = {
   bg: "#F7F1E8",            // creamy background
@@ -54,9 +75,79 @@ const ListRow = ({ icon = "✓", label, value, onPress }: ListRowProps) => (
 
 export default function Profile() {
   const { user, loading: authLoading } = useAuth();
-  const [userProfile, setUserProfile] = useState(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userRankings, setUserRankings] = useState<UserRanking[]>([]);
   const [profileLoading, setProfileLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Function to fetch full ranking documents
+  const fetchUserRankings = async (profile: UserProfile) => {
+    if (!profile.rankings || profile.rankings.length === 0) {
+      setUserRankings([]);
+      return;
+    }
+
+    try {
+      setProfileLoading(true);
+      
+      // Get all ranking IDs from user profile
+      const rankingIds = profile.rankings.map(ranking => ranking.rankingId);
+      const fullRankings: UserRanking[] = [];
+
+      // Fetch each ranking document individually
+      for (const rankingId of rankingIds) {
+        try {
+          const rankingDoc = await firestoreService.read('rankings', rankingId);
+          if (rankingDoc) {
+            // Ensure the document has the required fields
+            const ranking: UserRanking = {
+              rankingId: rankingDoc.id || rankingId,
+              spotId: (rankingDoc as any).spotId || '',
+              spotName: (rankingDoc as any).spotName || '',
+              spotLocation: (rankingDoc as any).spotLocation || '',
+              rating: (rankingDoc as any).rating || 0,
+              note: (rankingDoc as any).note || '',
+              createdAt: (rankingDoc as any).createdAt,
+              updatedAt: (rankingDoc as any).updatedAt
+            };
+            fullRankings.push(ranking);
+          }
+        } catch (err) {
+          console.warn(`Could not fetch ranking ${rankingId}:`, err);
+          // If ranking document doesn't exist, create a fallback from user profile data
+          const profileRanking = profile.rankings.find(r => r.rankingId === rankingId);
+          if (profileRanking) {
+            fullRankings.push({
+              rankingId: profileRanking.rankingId,
+              spotId: profileRanking.spotId,
+              spotName: profileRanking.spotName,
+              spotLocation: 'Location not available',
+              rating: profileRanking.rating,
+              note: 'No notes available',
+              createdAt: profileRanking.createdAt,
+              updatedAt: profileRanking.createdAt
+            });
+          }
+        }
+      }
+
+      // Sort by most recent first (createdAt descending)
+      const sortedRankings = fullRankings.sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      console.log('Fetched full user rankings:', sortedRankings);
+      setUserRankings(sortedRankings);
+    } catch (err) {
+      console.error('Error fetching user rankings:', err);
+      setError('Failed to load rankings');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -74,8 +165,11 @@ export default function Profile() {
         // Then fetch the updated profile
         const profile = await userService.getUserProfile(user.uid);
         console.log('Fetched user profile:', profile); // Debug log
-        setUserProfile(profile);
+        setUserProfile(profile as UserProfile);
         setError(null);
+
+        // Fetch full ranking documents
+        await fetchUserRankings(profile as UserProfile);
       } catch (err) {
         console.error('Error fetching user profile:', err);
         setError('Failed to load profile');
@@ -100,7 +194,10 @@ export default function Profile() {
       // Then fetch the updated profile
       const profile = await userService.getUserProfile(user.uid);
       console.log('Refreshed user profile:', profile); // Debug log
-      setUserProfile(profile);
+      setUserProfile(profile as UserProfile);
+
+      // Fetch full ranking documents
+      await fetchUserRankings(profile as UserProfile);
     } catch (err) {
       console.error('Error refreshing profile:', err);
     } finally {
@@ -108,7 +205,7 @@ export default function Profile() {
     }
   };
 
-  const formatJoinDate = (timestamp) => {
+  const formatJoinDate = (timestamp: any) => {
     if (!timestamp) return 'joined recently';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return `joined ${date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
@@ -193,63 +290,89 @@ export default function Profile() {
             <StatItem label="spots visited" value={userProfile?.totalSpots || 0} />
           </View>
 
-          {/* Debug info - remove this in production */}
-          {__DEV__ && userProfile && (
-            <View style={styles.debugContainer}>
-              <Text style={styles.debugText}>Debug: totalSpots={userProfile.totalSpots}, totalReviews={userProfile.totalReviews}</Text>
-              <TouchableOpacity 
-                style={styles.testButton} 
-                onPress={async () => {
-                  // Create a test activity (spot visit)
-                  await userService.incrementUserSpots(user.uid);
-                  // Create a test review
-                  await userService.incrementUserReviews(user.uid);
-                  // Refresh profile
-                  await refreshProfile();
-                }}
-              >
-                <Text style={styles.testButtonText}>Test: Add Spot + Review</Text>
-              </TouchableOpacity>
-            </View>
-          )}
 
           {/* Lists */}
           <View style={styles.section}>
-            <ListRow icon="✔︎" label="Been" value={userProfile?.totalSpots || 0} />
+            <ListRow 
+              icon="✔︎" 
+              label="Been" 
+              value={userProfile?.totalRankings || 0} 
+              onPress={() => {
+                // Navigate to rankings page
+                router.push({
+                  pathname: '/user-rankings',
+                  params: {
+                    userId: user?.uid,
+                    userName: userProfile?.displayName || user?.displayName || 'User'
+                  }
+                });
+              }}
+            />
             <View style={styles.divider} />
             <ListRow icon="⭐" label="Reviews" value={userProfile?.totalReviews || 0} />
             <View style={styles.divider} />
             <ListRow icon="🏆" label="Average Rating" value={userProfile?.averageRating ? userProfile.averageRating.toFixed(1) : '0.0'} />
           </View>
 
-          {/* Activity card */}
-          <View style={styles.activityCard}>
-            {/* Header */}
-            <View style={styles.activityHeader}>
-              <Image source={{ uri: AVATAR_URI }} style={styles.activityAvatar} />
-              <Text style={styles.activityText}>
-                <Text style={styles.you}>You</Text> ranked{" "}
-                <Text style={styles.bold}>The Charles River</Text>
-                {"\n"}<Text style={styles.location}>📍 Cambridge, MA</Text>
-              </Text>
-              <Text style={styles.score}>6.7</Text>
-            </View>
-
-            {/* Place image */}
-            <Image source={{ uri: PLACE_URI }} style={styles.placeImage} />
-
-            {/* Likes + comments */}
-            <View style={styles.externalBox}>
-              <Text style={styles.socialItem}>💌 24 likes</Text>
-              <Text style={styles.socialItem}>💬 5 comments</Text>
-            </View>
-
-            {/* Notes */}
-            <View style={styles.notesWrap}>
-              <Text style={styles.notesLabel}>Your note</Text>
-              <Text style={styles.notesText}>“beautiful sunday morning run”</Text>
-            </View>
+          {/* User's Rankings */}
+          <View style={styles.rankingsSection}>
+            <ThemedText style={styles.rankingsSectionTitle}>Your Recent Rankings</ThemedText>
+            {userRankings.length > 0 ? (
+              <View style={styles.rankingsList}>
+                {userRankings.slice(0, 3).map((ranking, index) => (
+                  <RankedCard
+                    key={ranking.rankingId}
+                    ranking={ranking}
+                    onPress={(ranking) => {
+                      router.push({
+                        pathname: '/spot-detail',
+                        params: {
+                          spotData: JSON.stringify({
+                            id: ranking.spotId,
+                            name: ranking.spotName,
+                            description: ranking.note || 'No description available',
+                            category: 'parks_nature',
+                            location: { 
+                              address: ranking.spotLocation,
+                              coordinates: {
+                                latitude: 0,
+                                longitude: 0
+                              }
+                            },
+                            photos: [],
+                            amenities: [],
+                            averageRating: ranking.rating,
+                            reviewCount: 1,
+                            totalRatings: 1,
+                            bestTimeToVisit: [],
+                            difficulty: 'varies',
+                            distance: '',
+                            duration: '',
+                            elevation: '',
+                            isVerified: false,
+                            npsCode: '',
+                            website: '',
+                            tags: [],
+                            createdAt: ranking.createdAt || new Date(),
+                            createdBy: user?.uid || '',
+                            source: 'USER_ADDED',
+                            updatedAt: ranking.updatedAt || new Date()
+                          })
+                        }
+                      });
+                    }}
+                    style={styles.rankingCard}
+                  />
+                ))}
+              </View>
+            ) : (
+              <View style={styles.noRankingsContainer}>
+                <Text style={styles.noRankingsText}>No rankings yet</Text>
+                <Text style={styles.noRankingsSubtext}>Visit spots and rate them to see your rankings here</Text>
+              </View>
+            )}
           </View>
+
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -388,31 +511,41 @@ const styles = StyleSheet.create({
     color: PALETTE.subtext,
     textAlign: 'center',
   },
-  debugContainer: {
-    backgroundColor: '#FFF3E0',
-    padding: 12,
-    margin: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FFB74D',
+  
+  // Rankings section
+  rankingsSection: {
+    marginTop: 20,
+    marginHorizontal: 12,
   },
-  debugText: {
-    fontSize: 12,
-    color: '#E65100',
-    fontFamily: 'monospace',
-    marginBottom: 8,
+  rankingsSectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: PALETTE.text,
+    marginBottom: 12,
   },
-  testButton: {
-    backgroundColor: PALETTE.accent,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginTop: 8,
+  rankingsList: {
+    gap: 12,
   },
-  testButtonText: {
-    color: 'white',
-    fontSize: 12,
+  rankingCard: {
+    marginBottom: 0, // Remove default margin since we're using gap
+  },
+  noRankingsContainer: {
+    backgroundColor: PALETTE.card,
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+  },
+  noRankingsText: {
+    fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
+    color: PALETTE.text,
+    marginBottom: 4,
   },
+  noRankingsSubtext: {
+    fontSize: 14,
+    color: PALETTE.subtext,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+
 });

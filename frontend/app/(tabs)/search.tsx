@@ -484,11 +484,16 @@ async function searchFirestore(tab: TabKey, queryInput: string): Promise<ResultI
     return snap.docs.map(d => {
       const data = d.data() as SpotCardType;
       // console.log("Document data:", data);
+      // Ensure the spot data includes the document ID
+      const spotDataWithId = {
+        ...data,
+        id: d.id || `spot_${Date.now()}_${Math.random()}`
+      };
       return { 
         id: d.id || `spot_${Date.now()}_${Math.random()}`, 
         title: data?.name || "(untitled)", 
         subtitle: buildLocationSubtitle(data),
-        spotData: data // Add the full spot data
+        spotData: spotDataWithId // Add the full spot data with ID
       };
     });
   } else {

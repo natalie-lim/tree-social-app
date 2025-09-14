@@ -1,15 +1,17 @@
 // app/(tabs)/leaderboard.tsx
-import { View, Text, StyleSheet, FlatList } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
+import { firestoreService } from "../../services/firestore";
 
-// ---- demo data (replace with your real scores) ----
-const SAMPLE = [
-  { name: "angie", points: 87 },
-  { name: "luna", points: 41 },
-  { name: "andrew", points: 0 },
-  { name: "kat", points: 41 },
-  { name: "miles", points: 0 },
-];
+interface LeaderboardUser {
+  id: string;
+  name: string;
+  points: number;
+  totalSpots: number;
+  totalReviews: number;
+  averageRating: number;
+}
 
 const COLORS = {
   bg: "#FFF6EC",          // soft cream
@@ -22,8 +24,66 @@ const COLORS = {
 };
 
 export default function Leaderboard() {
+  const [users, setUsers] = useState<LeaderboardUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch all users from the database
+        const allUsers = await firestoreService.query('users', []);
+        
+        // Calculate points for each user (spots + reviews + average rating)
+        const leaderboardUsers: LeaderboardUser[] = allUsers.map((user: any) => ({
+          id: user.id,
+          name: user.displayName || 'Anonymous',
+          points: (user.totalSpots || 0) + (user.totalReviews || 0) + Math.round((user.averageRating || 0) * 10),
+          totalSpots: user.totalSpots || 0,
+          totalReviews: user.totalReviews || 0,
+          averageRating: user.averageRating || 0
+        }));
+
+        // Sort by points descending
+        const sorted = leaderboardUsers.sort((a, b) => b.points - a.points);
+        setUsers(sorted);
+      } catch (err) {
+        console.error('Error fetching leaderboard:', err);
+        setError('Failed to load leaderboard');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.screen}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.accent} />
+          <Text style={styles.loadingText}>Loading leaderboard...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.screen}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      </View>
+    );
+  }
+
   // sort high→low and split podium vs rest
-  const sorted = [...SAMPLE].sort((a, b) => b.points - a.points);
+  const sorted = [...users].sort((a, b) => b.points - a.points);
   const podium = sorted.slice(0, 3);
   const others = sorted.slice(3);
 
@@ -248,5 +308,30 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: 16,
     marginLeft: "auto",
+  },
+
+  // Loading and Error states
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.bg,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: COLORS.subtext,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.bg,
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: COLORS.subtext,
+    textAlign: 'center',
   },
 });

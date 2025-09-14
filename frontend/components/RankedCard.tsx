@@ -8,62 +8,33 @@ import {
 } from 'react-native';
 import { ThemedText } from './themed-text';
 
-// Types based on the document structure
-export interface SpotPhoto {
-  caption: string;
-  credit: string;
-  url: string;
-}
-
-export interface SpotLocation {
-  address: string;
-  coordinates: {
-    latitude: number;
-    longitude: number;
-  };
-}
-
-export interface Spot {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  location: SpotLocation;
-  photos: SpotPhoto[];
-  amenities: string[];
-  averageRating: number;
-  reviewCount: number;
-  totalRatings: number;
-  bestTimeToVisit: string[];
-  difficulty: string;
-  distance: string;
-  duration: string;
-  elevation: string;
-  isVerified: boolean;
-  npsCode?: string;
-  website?: string;
-  tags: string[];
+// Types for ranking data
+export interface UserRanking {
+  rankingId: string;
+  spotId: string;
+  spotName: string;
+  spotLocation: string;
+  rating: number;
+  note?: string;
   createdAt: any;
   updatedAt: any;
-  createdBy: string;
-  source: string;
 }
 
-interface SpotCardProps {
-  spot: Spot;
-  onPress?: (spot: Spot) => void;
+interface RankedCardProps {
+  ranking: UserRanking;
+  onPress?: (ranking: UserRanking) => void;
   style?: any;
 }
 
 const { width } = Dimensions.get('window');
 
-export function SpotCard({ spot, onPress, style }: SpotCardProps) {
+export function RankedCard({ ranking, onPress, style }: RankedCardProps) {
   const accentColor = '#6FA076'; // Your app's accent color
 
   return (
     <Pressable 
       style={[styles.card, style]} 
-      onPress={() => onPress?.(spot)}
+      onPress={() => onPress?.(ranking)}
     >
       <View style={styles.cardContent}>
         {/* Main Row */}
@@ -71,26 +42,24 @@ export function SpotCard({ spot, onPress, style }: SpotCardProps) {
           {/* Left side - Spot info */}
           <View style={styles.spotInfo}>
             <ThemedText style={styles.spotName} numberOfLines={1}>
-              {spot.name}
+              {ranking.spotName}
             </ThemedText>
             <ThemedText style={styles.spotLocation} numberOfLines={1}>
-              {spot.location.address}
+              {ranking.spotLocation}
             </ThemedText>
           </View>
           
           {/* Right side - Rating circle */}
-          {spot.averageRating > 0 && (
-            <View style={styles.ratingCircle}>
-              <Text style={styles.ratingText}>{spot.averageRating.toFixed(1)}</Text>
-            </View>
-          )}
+          <View style={styles.ratingCircle}>
+            <Text style={styles.ratingText}>{ranking.rating.toFixed(1)}</Text>
+          </View>
         </View>
 
         {/* User Notes Section */}
         <View style={styles.notesSection}>
           <ThemedText style={styles.notesLabel}>Your Notes:</ThemedText>
           <ThemedText style={styles.notesText}>
-            {spot.description || 'No notes added yet'}
+            {ranking.note || 'No notes added yet'}
           </ThemedText>
         </View>
 
@@ -98,11 +67,11 @@ export function SpotCard({ spot, onPress, style }: SpotCardProps) {
         <View style={styles.socialSection}>
           <View style={styles.socialItem}>
             <Text style={styles.socialIcon}>💬</Text>
-            <ThemedText style={styles.socialText}>{spot.reviewCount || 0} comments</ThemedText>
+            <ThemedText style={styles.socialText}>0 comments</ThemedText>
           </View>
           <View style={styles.socialItem}>
             <Text style={styles.socialIcon}>❤️</Text>
-            <ThemedText style={styles.socialText}>{spot.totalRatings || 0} likes</ThemedText>
+            <ThemedText style={styles.socialText}>0 likes</ThemedText>
           </View>
         </View>
       </View>

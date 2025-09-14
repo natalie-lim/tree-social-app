@@ -1,4 +1,5 @@
 // app/(tabs)/feed.tsx
+import { ActivityFeed } from "@/components/ActivityFeed";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -45,11 +46,58 @@ export default function Feed() {
         <Pill icon="navigate-outline" label="Open Map" onPress={() => router.push("/map")} />
       </View>
 
-      {/* Feed placeholder */}
-      <Text style={styles.sectionTitle}>Your Feed</Text>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Nothing here yet</Text>
-        <Text style={styles.cardSub}>Follow friends or add places to see updates.</Text>
+      {/* Activity Feed */}
+      <View style={styles.feedContainer}>
+        <Text style={styles.sectionTitle}>Your Feed</Text>
+        <ActivityFeed
+          onActivityPress={(activity) => {
+            // Navigate to spot detail
+            router.push({
+              pathname: '/spot-detail',
+              params: {
+                spotData: JSON.stringify({
+                  id: activity.spotId,
+                  name: activity.spotName,
+                  description: activity.note || 'No description available',
+                  category: 'parks_nature',
+                  location: { 
+                    address: activity.spotLocation,
+                    coordinates: {
+                      latitude: 0,
+                      longitude: 0
+                    }
+                  },
+                  photos: activity.spotImage ? [{ 
+                    url: activity.spotImage,
+                    caption: activity.spotName,
+                    credit: 'User Upload'
+                  }] : [],
+                  amenities: [],
+                  averageRating: activity.rating || 0,
+                  reviewCount: 0,
+                  totalRatings: 0,
+                  bestTimeToVisit: [],
+                  difficulty: 'varies',
+                  distance: '',
+                  duration: '',
+                  elevation: '',
+                  isVerified: false,
+                  npsCode: '',
+                  website: '',
+                  tags: [],
+                  createdAt: activity.createdAt || new Date(),
+                  createdBy: activity.userId,
+                  source: 'USER_ADDED',
+                  updatedAt: activity.createdAt || new Date()
+                })
+              }
+            });
+          }}
+          onCommentPress={(activityId) => {
+            // Navigate to comments
+            console.log('Comment pressed:', activityId);
+          }}
+        />
       </View>
     </ScrollView>
   );
@@ -152,5 +200,9 @@ const styles = StyleSheet.create({
   cardSub: {
     marginTop: 6,
     color: COLORS.sub,
+  },
+  feedContainer: {
+    flex: 1,
+    marginTop: 8,
   },
 });

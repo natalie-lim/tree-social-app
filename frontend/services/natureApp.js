@@ -22,6 +22,7 @@ export const userService = {
       followingCount: 0,
       totalSpots: 0,
       totalReviews: 0,
+      totalRankings: 0,
       averageRating: 0,
       badges: [],
       joinedAt: Timestamp.now()
@@ -92,6 +93,11 @@ export const userService = {
         { field: 'type', operator: '==', value: 'spot_visit' }
       ]);
       
+      // Get user's rankings count
+      const userRankings = await firestoreService.query('rankings', [
+        { field: 'userId', operator: '==', value: userId }
+      ]);
+      
       // Calculate average rating from reviews
       const averageRating = userReviews.length > 0 
         ? userReviews.reduce((sum, review) => sum + (review.rating || 0), 0) / userReviews.length
@@ -103,6 +109,7 @@ export const userService = {
         await firestoreService.update('users', userProfile.id, {
           totalSpots: userActivities.length,
           totalReviews: userReviews.length,
+          totalRankings: userRankings.length,
           averageRating: Math.round(averageRating * 10) / 10,
           updatedAt: Timestamp.now()
         });

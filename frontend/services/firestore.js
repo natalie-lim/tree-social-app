@@ -1,17 +1,17 @@
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    getDoc,
-    getDocs,
-    limit,
-    onSnapshot,
-    orderBy,
-    query,
-    Timestamp,
-    updateDoc,
-    where
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  Timestamp,
+  updateDoc,
+  where
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
@@ -20,14 +20,18 @@ export const firestoreService = {
   // Create a new document
   async create(collectionName, data) {
     try {
+      console.log(`Creating document in ${collectionName}:`, data);
       const docRef = await addDoc(collection(db, collectionName), {
         ...data,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       });
+      console.log(`Document created with ID: ${docRef.id}`);
       return docRef.id;
     } catch (error) {
       console.error('Error creating document:', error);
+      console.error('Collection:', collectionName);
+      console.error('Data:', data);
       throw error;
     }
   },
@@ -215,5 +219,94 @@ export const spotsService = {
     // This would need to be implemented with proper text search
     // For now, we'll use the existing search functionality
     return await firestoreService.query('spots', [], 'name', limitCount);
+  }
+};
+
+// Activities service
+export const activitiesService = {
+  async createActivity(activityData) {
+    return await firestoreService.create('activities', activityData);
+  },
+
+  async getActivities(limitCount = 20) {
+    return await firestoreService.query('activities', [], 'createdAt', limitCount);
+  },
+
+  async getUserActivities(userId, limitCount = 20) {
+    return await firestoreService.query('activities', [
+      { field: 'userId', operator: '==', value: userId }
+    ], 'createdAt', limitCount);
+  },
+
+  async getActivityById(activityId) {
+    return await firestoreService.read('activities', activityId);
+  },
+
+  async updateActivity(activityId, activityData) {
+    return await firestoreService.update('activities', activityId, activityData);
+  },
+
+  async deleteActivity(activityId) {
+    return await firestoreService.delete('activities', activityId);
+  },
+
+  async likeActivity(activityId, userId, isLiked) {
+    const activity = await this.getActivityById(activityId);
+    if (!activity) throw new Error('Activity not found');
+
+    const newLikes = isLiked ? activity.likes + 1 : Math.max(0, activity.likes - 1);
+    
+    return await this.updateActivity(activityId, {
+      likes: newLikes,
+      isLiked: isLiked
+    });
+  },
+
+  async addComment(activityId, commentData) {
+    const activity = await this.getActivityById(activityId);
+    if (!activity) throw new Error('Activity not found');
+
+    return await this.updateActivity(activityId, {
+      comments: (activity.comments || 0) + 1
+    });
+  }
+};
+
+// Rankings service
+export const rankingsService = {
+  async createRanking(rankingData) {
+    return await firestoreService.create('rankings', rankingData);
+  },
+
+  async getUserRankings(userId, limitCount = 20) {
+    return await firestoreService.query('rankings', [
+      { field: 'userId', operator: '==', value: userId }
+    ], 'createdAt', limitCount);
+  },
+
+  async getSpotRankings(spotId, limitCount = 20) {
+    return await firestoreService.query('rankings', [
+      { field: 'spotId', operator: '==', value: spotId }
+    ], 'createdAt', limitCount);
+  },
+
+  async getRankingById(rankingId) {
+    return await firestoreService.read('rankings', rankingId);
+  },
+
+  async updateRanking(rankingId, rankingData) {
+    return await firestoreService.update('rankings', rankingId, rankingData);
+  },
+
+  async deleteRanking(rankingId) {
+    return await firestoreService.delete('rankings', rankingId);
+  },
+
+  async getUserRankingForSpot(userId, spotId) {
+    const rankings = await firestoreService.query('rankings', [
+      { field: 'userId', operator: '==', value: userId },
+      { field: 'spotId', operator: '==', value: spotId }
+    ]);
+    return rankings.length > 0 ? rankings[0] : null;
   }
 };

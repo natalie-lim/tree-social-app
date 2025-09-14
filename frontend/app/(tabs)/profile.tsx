@@ -4,13 +4,12 @@ import { ThemedText } from "@/components/themed-text";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  Image,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { CuteLoading } from "../../components/CuteLoading";
 import { useAuth } from "../../contexts/AuthContext";
@@ -19,7 +18,11 @@ import { firestoreService } from "../../services/firestore";
 import { userService } from "../../services/natureApp";
 
 type Stat = { label: string; value: string | number };
-type ListRowProps = { icon?: string; label: string; value?: string | number; onPress?: () => void };
+type ListRowProps = {
+  label: string;
+  value?: string | number;
+  onPress?: () => void;
+};
 
 interface UserProfile {
   id: string;
@@ -38,20 +41,18 @@ interface UserProfile {
   totalRankings?: number;
 }
 
-
 const PALETTE = {
-  bg: "#F7F1E8",            // creamy background
+  bg: "#F7F1E8", // creamy background
   card: "#FFFFFF",
   text: "#3E3E3E",
-  subtext: "#6F7B6F",       // leaf green-ish for secondary
-  accent: "#6FA076",        // leafy green
+  subtext: "#6F7B6F", // leaf green-ish for secondary
+  accent: "#6FA076", // leafy green
   accentDark: "#5C8B64",
   divider: "#E6E0D6",
-  externalBg: "#F1EFE9",    // new: muted tan/gray for external likes/comments
+  externalBg: "#F1EFE9", // new: muted tan/gray for external likes/comments
 };
 
-const AVATAR_URI =
-  "https://i.imgur.com/3GvwNBf.png"; // placeholder
+const AVATAR_URI = "https://i.imgur.com/3GvwNBf.png"; // placeholder
 const PLACE_URI =
   "https://images.unsplash.com/photo-1505852679233-d9fd70aff56d?q=80&w=1200&auto=format&fit=crop";
 
@@ -62,21 +63,22 @@ const StatItem = ({ label, value }: Stat) => (
   </View>
 );
 
-const ListRow = ({ icon = "✓", label, value, onPress }: ListRowProps) => (
+const ListRow = ({ label, value, onPress }: ListRowProps) => (
   <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.row}>
     <View style={styles.rowLeft}>
-      <Text style={styles.rowIcon}>{icon}</Text>
       <Text style={styles.rowLabel}>{label}</Text>
     </View>
     <View style={styles.rowRight}>
-      {value !== undefined ? <Text style={styles.rowValue}>{value}</Text> : null}
+      {value !== undefined ? (
+        <Text style={styles.rowValue}>{value}</Text>
+      ) : null}
       <Text style={styles.chevron}>›</Text>
     </View>
   </TouchableOpacity>
 );
 
 export default function Profile() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const { shouldRefreshProfile, clearRefreshFlag } = useRefresh();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userRankings, setUserRankings] = useState<UserRanking[]>([]);
@@ -85,30 +87,35 @@ export default function Profile() {
 
   // Function to fetch full ranking documents
   const fetchUserRankings = async (profile: UserProfile) => {
-    if (!profile.rankings || profile.rankings.length === 0) {
+    if (
+      !profile ||
+      !profile.rankings ||
+      !Array.isArray(profile.rankings) ||
+      profile.rankings.length === 0
+    ) {
       setUserRankings([]);
       return;
     }
 
     try {
       setProfileLoading(true);
-      
+
       // Get all ranking IDs from user profile
-      const rankingIds = profile.rankings.map(ranking => ranking.rankingId);
+      const rankingIds = profile.rankings.map((ranking) => ranking.rankingId);
       const fullRankings: UserRanking[] = [];
 
       // Fetch each ranking document individually
       for (const rankingId of rankingIds) {
         try {
-          const rankingDoc = await firestoreService.read('rankings', rankingId);
+          const rankingDoc = await firestoreService.read("rankings", rankingId);
           if (rankingDoc) {
-            const spotId = (rankingDoc as any).spotId || '';
-            
+            const spotId = (rankingDoc as any).spotId || "";
+
             // Fetch full spot data
             let spotData = null;
             if (spotId) {
               try {
-                spotData = await firestoreService.read('spots', spotId);
+                spotData = await firestoreService.read("spots", spotId);
               } catch (spotErr) {
                 console.warn(`Could not fetch spot ${spotId}:`, spotErr);
               }
@@ -118,62 +125,76 @@ export default function Profile() {
             const ranking: UserRanking = {
               rankingId: rankingDoc.id || rankingId,
               spotId: spotId,
-              spotName: spotData ? (spotData as any).name : (rankingDoc as any).spotName || '',
-              spotLocation: spotData ? (spotData as any).location?.address : (rankingDoc as any).spotLocation || '',
+              spotName: spotData
+                ? (spotData as any).name
+                : (rankingDoc as any).spotName || "",
+              spotLocation: spotData
+                ? (spotData as any).location?.address
+                : (rankingDoc as any).spotLocation || "",
               rating: (rankingDoc as any).rating || 0,
-              note: (rankingDoc as any).note || '',
+              note: (rankingDoc as any).note || "",
               createdAt: (rankingDoc as any).createdAt,
               updatedAt: (rankingDoc as any).updatedAt,
               // Add full spot data for navigation
-              spotData: spotData ? {
-                id: spotData.id || spotId,
-                name: (spotData as any).name || (rankingDoc as any).spotName || '',
-                description: (spotData as any).description || 'No description available',
-                category: (spotData as any).category || 'No category',
-                location: (spotData as any).location || { 
-                  address: (rankingDoc as any).spotLocation || 'Unknown Location',
-                  coordinates: (spotData as any).location?.coordinates || {
-                    latitude: 0,
-                    longitude: 0
+              spotData: spotData
+                ? {
+                    id: spotData.id || spotId,
+                    name:
+                      (spotData as any).name ||
+                      (rankingDoc as any).spotName ||
+                      "",
+                    description:
+                      (spotData as any).description ||
+                      "No description available",
+                    category: (spotData as any).category || "No category",
+                    location: (spotData as any).location || {
+                      address:
+                        (rankingDoc as any).spotLocation || "Unknown Location",
+                      coordinates: (spotData as any).location?.coordinates || {
+                        latitude: 0,
+                        longitude: 0,
+                      },
+                    },
+                    photos: (spotData as any).photos || [],
+                    amenities: (spotData as any).amenities || [],
+                    averageRating: (spotData as any).averageRating || 0,
+                    reviewCount: (spotData as any).reviewCount || 0,
+                    totalRatings: (spotData as any).totalRatings || 0,
+                    bestTimeToVisit: (spotData as any).bestTimeToVisit || [],
+                    difficulty: (spotData as any).difficulty || "varies",
+                    distance: (spotData as any).distance || "",
+                    duration: (spotData as any).duration || "",
+                    elevation: (spotData as any).elevation || "",
+                    isVerified: (spotData as any).isVerified || false,
+                    npsCode: (spotData as any).npsCode || "",
+                    website: (spotData as any).website || "",
+                    tags: (spotData as any).tags || [],
+                    createdAt: (spotData as any).createdAt || new Date(),
+                    createdBy: (spotData as any).createdBy || "",
+                    source: (spotData as any).source || "USER_ADDED",
+                    updatedAt: (spotData as any).updatedAt || new Date(),
                   }
-                },
-                photos: (spotData as any).photos || [],
-                amenities: (spotData as any).amenities || [],
-                averageRating: (spotData as any).averageRating || 0,
-                reviewCount: (spotData as any).reviewCount || 0,
-                totalRatings: (spotData as any).totalRatings || 0,
-                bestTimeToVisit: (spotData as any).bestTimeToVisit || [],
-                difficulty: (spotData as any).difficulty || 'varies',
-                distance: (spotData as any).distance || '',
-                duration: (spotData as any).duration || '',
-                elevation: (spotData as any).elevation || '',
-                isVerified: (spotData as any).isVerified || false,
-                npsCode: (spotData as any).npsCode || '',
-                website: (spotData as any).website || '',
-                tags: (spotData as any).tags || [],
-                createdAt: (spotData as any).createdAt || new Date(),
-                createdBy: (spotData as any).createdBy || '',
-                source: (spotData as any).source || 'USER_ADDED',
-                updatedAt: (spotData as any).updatedAt || new Date()
-              } : null
+                : null,
             };
             fullRankings.push(ranking);
           }
         } catch (err) {
           console.warn(`Could not fetch ranking ${rankingId}:`, err);
           // If ranking document doesn't exist, create a fallback from user profile data
-          const profileRanking = profile.rankings.find(r => r.rankingId === rankingId);
+          const profileRanking = profile.rankings.find(
+            (r) => r.rankingId === rankingId
+          );
           if (profileRanking) {
             fullRankings.push({
               rankingId: profileRanking.rankingId,
               spotId: profileRanking.spotId,
               spotName: profileRanking.spotName,
-              spotLocation: 'Location not available',
+              spotLocation: "Location not available",
               rating: profileRanking.rating,
-              note: 'No notes available',
+              note: "No notes available",
               createdAt: profileRanking.createdAt,
               updatedAt: profileRanking.createdAt,
-              spotData: null
+              spotData: null,
             });
           }
         }
@@ -181,21 +202,28 @@ export default function Profile() {
 
       // Sort by most recent first (createdAt descending)
       const sortedRankings = fullRankings.sort((a, b) => {
-        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+        const dateA = a.createdAt?.toDate
+          ? a.createdAt.toDate()
+          : new Date(a.createdAt);
+        const dateB = b.createdAt?.toDate
+          ? b.createdAt.toDate()
+          : new Date(b.createdAt);
         return dateB.getTime() - dateA.getTime();
       });
 
+<<<<<<< HEAD
       console.log('Fetched full user rankings');
+=======
+      console.log("Fetched full user rankings:", sortedRankings);
+>>>>>>> origin
       setUserRankings(sortedRankings);
     } catch (err) {
-      console.error('Error fetching user rankings:', err);
-      setError('Failed to load rankings');
+      console.error("Error fetching user rankings:", err);
+      setError("Failed to load rankings");
     } finally {
       setProfileLoading(false);
     }
   };
-
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -206,21 +234,21 @@ export default function Profile() {
 
       try {
         setProfileLoading(true);
-        
+
         // First, update user stats from actual data
         await userService.updateUserStats(user.uid);
-        
+
         // Then fetch the updated profile
         const profile = await userService.getUserProfile(user.uid);
-        console.log('Fetched user profile:', profile); // Debug log
+        console.log("Fetched user profile:", profile); // Debug log
         setUserProfile(profile as UserProfile);
         setError(null);
 
         // Fetch full ranking documents
         await fetchUserRankings(profile as UserProfile);
       } catch (err) {
-        console.error('Error fetching user profile:', err);
-        setError('Failed to load profile');
+        console.error("Error fetching user profile:", err);
+        setError("Failed to load profile");
       } finally {
         setProfileLoading(false);
       }
@@ -232,7 +260,7 @@ export default function Profile() {
   // Handle refresh trigger from tab press
   useEffect(() => {
     if (shouldRefreshProfile && user) {
-      console.log('Refreshing profile due to tab press');
+      console.log("Refreshing profile due to tab press");
       refreshProfile();
       clearRefreshFlag();
     }
@@ -241,40 +269,174 @@ export default function Profile() {
   // Add refresh functionality
   const refreshProfile = async () => {
     if (!user) return;
-    
+
     try {
       setProfileLoading(true);
-      
+
       // Update user stats from actual data
       await userService.updateUserStats(user.uid);
-      
+
       // Then fetch the updated profile
       const profile = await userService.getUserProfile(user.uid);
+<<<<<<< HEAD
       console.log('Refreshed user profile'); // Debug log
+=======
+      console.log("Refreshed user profile:", profile); // Debug log
+>>>>>>> origin
       setUserProfile(profile as UserProfile);
 
       // Fetch full ranking documents
       await fetchUserRankings(profile as UserProfile);
     } catch (err) {
-      console.error('Error refreshing profile:', err);
+      console.error("Error refreshing profile:", err);
     } finally {
       setProfileLoading(false);
     }
   };
 
+  // Function to fetch full spot data on demand
+  const fetchSpotDataOnDemand = async (ranking: UserRanking) => {
+    if (ranking.spotData) {
+      // Already have spot data, navigate directly
+      return ranking.spotData;
+    }
+
+    if (!ranking.spotId) {
+      // No spot ID, return fallback data
+      return {
+        id: ranking.spotId,
+        name: ranking.spotName,
+        description: ranking.note || "No description available",
+        category: "No category",
+        location: {
+          address: ranking.spotLocation,
+          coordinates: {
+            latitude: 0,
+            longitude: 0,
+          },
+        },
+        photos: [],
+        amenities: [],
+        averageRating: ranking.rating,
+        reviewCount: 1,
+        totalRatings: 1,
+        bestTimeToVisit: [],
+        difficulty: "varies",
+        distance: "",
+        duration: "",
+        elevation: "",
+        isVerified: false,
+        npsCode: "",
+        website: "",
+        tags: [],
+        createdAt: ranking.createdAt || new Date(),
+        createdBy: user?.uid || "",
+        source: "USER_ADDED",
+        updatedAt: ranking.updatedAt || new Date(),
+      };
+    }
+
+    try {
+      // Fetch full spot data
+      const spotData = await firestoreService.read("spots", ranking.spotId);
+      if (spotData) {
+        return {
+          id: spotData.id || ranking.spotId,
+          name: (spotData as any).name || ranking.spotName || "",
+          description:
+            (spotData as any).description || "No description available",
+          category: (spotData as any).category || "No category",
+          location: (spotData as any).location || {
+            address: ranking.spotLocation || "Unknown Location",
+            coordinates: (spotData as any).location?.coordinates || {
+              latitude: 0,
+              longitude: 0,
+            },
+          },
+          photos: (spotData as any).photos || [],
+          amenities: (spotData as any).amenities || [],
+          averageRating: (spotData as any).averageRating || 0,
+          reviewCount: (spotData as any).reviewCount || 0,
+          totalRatings: (spotData as any).totalRatings || 0,
+          bestTimeToVisit: (spotData as any).bestTimeToVisit || [],
+          difficulty: (spotData as any).difficulty || "varies",
+          distance: (spotData as any).distance || "",
+          duration: (spotData as any).duration || "",
+          elevation: (spotData as any).elevation || "",
+          isVerified: (spotData as any).isVerified || false,
+          npsCode: (spotData as any).npsCode || "",
+          website: (spotData as any).website || "",
+          tags: (spotData as any).tags || [],
+          createdAt: (spotData as any).createdAt || new Date(),
+          createdBy: (spotData as any).createdBy || "",
+          source: (spotData as any).source || "USER_ADDED",
+          updatedAt: (spotData as any).updatedAt || new Date(),
+        };
+      }
+    } catch (err) {
+      console.warn(`Could not fetch spot ${ranking.spotId}:`, err);
+    }
+
+    // Fallback if spot data fetch fails
+    return {
+      id: ranking.spotId,
+      name: ranking.spotName,
+      description: ranking.note || "No description available",
+      category: "No category",
+      location: {
+        address: ranking.spotLocation,
+        coordinates: {
+          latitude: 0,
+          longitude: 0,
+        },
+      },
+      photos: [],
+      amenities: [],
+      averageRating: ranking.rating,
+      reviewCount: 1,
+      totalRatings: 1,
+      bestTimeToVisit: [],
+      difficulty: "varies",
+      distance: "",
+      duration: "",
+      elevation: "",
+      isVerified: false,
+      npsCode: "",
+      website: "",
+      tags: [],
+      createdAt: ranking.createdAt || new Date(),
+      createdBy: user?.uid || "",
+      source: "USER_ADDED",
+      updatedAt: ranking.updatedAt || new Date(),
+    };
+  };
+
   const formatJoinDate = (timestamp: any) => {
-    if (!timestamp) return 'joined recently';
+    if (!timestamp) return "joined recently";
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return `joined ${date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+    return `joined ${date.toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric",
+    })}`;
+  };
+
+  const logout = async () => {
+    try {
+      await signOut();
+      // Navigate to frontpage after successful logout
+      router.replace("/(auth)/frontpage");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   if (authLoading || profileLoading) {
     return (
       <SafeAreaView style={styles.safe}>
-        <CuteLoading 
-          message="Loading your profile..." 
-          size="medium" 
-          showMessage={true} 
+        <CuteLoading
+          message="Loading your profile..."
+          size="medium"
+          showMessage={true}
         />
       </SafeAreaView>
     );
@@ -284,7 +446,9 @@ export default function Profile() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Please log in to view your profile</Text>
+          <Text style={styles.errorText}>
+            Please log in to view your profile
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -295,6 +459,17 @@ export default function Profile() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
+          <View style={styles.errorButtonContainer}>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={refreshProfile}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+              <Text style={styles.logoutButtonText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -312,70 +487,106 @@ export default function Profile() {
 
           {/* Avatar */}
           <View style={styles.avatarWrap}>
-            <Image 
-              source={{ 
-                uri: userProfile?.profilePhoto || user?.photoURL || AVATAR_URI 
-              }} 
-              style={styles.avatar} 
-            />
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {(userProfile?.displayName || user?.displayName || "U")
+                  .charAt(0)
+                  .toUpperCase()}
+              </Text>
+            </View>
           </View>
 
           {/* Handle + joined */}
           <View style={styles.centerWrap}>
-            <Text style={styles.handle}>@{userProfile?.displayName || user?.displayName || 'user'}</Text>
+            <Text style={styles.handle}>
+              @{userProfile?.displayName || user?.displayName || "user"}
+            </Text>
             <Text style={styles.joined}>
-              {userProfile?.joinedAt ? formatJoinDate(userProfile.joinedAt) : 'joined recently'}
+              {userProfile?.joinedAt
+                ? formatJoinDate(userProfile.joinedAt)
+                : "joined recently"}
             </Text>
           </View>
 
           {/* Action buttons */}
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={[styles.ghostButton]} onPress={refreshProfile}>
+            <TouchableOpacity
+              style={[styles.ghostButton]}
+              onPress={refreshProfile}
+            >
               <Text style={styles.ghostButtonText}>refresh</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.ghostButton]}>
               <Text style={styles.ghostButtonText}>edit profile</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.ghostButton]}>
-              <Text style={styles.ghostButtonText}>share profile</Text>
+            <TouchableOpacity
+              style={[styles.ghostButton, styles.logoutGhostButton]}
+              onPress={logout}
+            >
+              <Text
+                style={[styles.ghostButtonText, styles.logoutGhostButtonText]}
+              >
+                logout
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* Stats */}
           <View style={styles.statsRow}>
-            <StatItem label="followers" value={userProfile?.followerCount || 0} />
-            <StatItem label="following" value={userProfile?.followingCount || 0} />
-            <StatItem label="spots visited" value={userProfile?.totalSpots || 0} />
+            <StatItem
+              label="followers"
+              value={userProfile?.followerCount || 0}
+            />
+            <StatItem
+              label="following"
+              value={userProfile?.followingCount || 0}
+            />
+            <StatItem
+              label="spots visited"
+              value={userProfile?.totalSpots || 0}
+            />
           </View>
-
 
           {/* Lists */}
           <View style={styles.section}>
-            <ListRow 
-              icon="✔︎" 
-              label="Been" 
-              value={userProfile?.totalRankings || 0} 
+            <ListRow
+              label="Been"
+              value={userProfile?.totalRankings || 0}
               onPress={() => {
                 // Navigate to rankings page
                 router.push({
-                  pathname: '/user-rankings',
+                  pathname: "/user-rankings",
                   params: {
                     userId: user?.uid,
-                    userName: userProfile?.displayName || user?.displayName || 'User'
-                  }
+                    userName:
+                      userProfile?.displayName || user?.displayName || "User",
+                  },
                 });
               }}
             />
             <View style={styles.divider} />
-            <ListRow icon="⭐" label="Reviews" value={userProfile?.totalReviews || 0} />
+            <ListRow label="Reviews" value={userProfile?.totalReviews || 0} />
             <View style={styles.divider} />
+<<<<<<< HEAD
             <ListRow icon="🏆" label="Average Rating" value={userProfile?.averageRating ? userProfile.averageRating.toFixed(1) : '0.0'} />
             <ListRow icon="📊" label="Average Ranking" value={userProfile?.averageRanking ? userProfile.averageRanking.toFixed(1) : '0.0'} />
+=======
+            <ListRow
+              label="Average Rating"
+              value={
+                userProfile?.averageRating
+                  ? userProfile.averageRating.toFixed(1)
+                  : "0.0"
+              }
+            />
+>>>>>>> origin
           </View>
 
           {/* User's Rankings */}
           <View style={styles.rankingsSection}>
-            <ThemedText style={styles.rankingsSectionTitle}>Your Recent Rankings</ThemedText>
+            <ThemedText style={styles.rankingsSectionTitle}>
+              Your Recent Rankings
+            </ThemedText>
             {userRankings.length > 0 ? (
               <View style={styles.rankingsList}>
                 {userRankings.slice(0, 3).map((ranking, index) => (
@@ -386,27 +597,28 @@ export default function Profile() {
                       // Navigate to spot detail with full spot data
                       if (ranking.spotData) {
                         router.push({
-                          pathname: '/spot-detail',
+                          pathname: "/spot-detail",
                           params: {
-                            spotData: JSON.stringify(ranking.spotData)
-                          }
+                            spotData: JSON.stringify(ranking.spotData),
+                          },
                         });
                       } else {
                         // Fallback to basic data if spot data not available
                         router.push({
-                          pathname: '/spot-detail',
+                          pathname: "/spot-detail",
                           params: {
                             spotData: JSON.stringify({
                               id: ranking.spotId,
                               name: ranking.spotName,
-                              description: ranking.note || 'No description available',
-                              category: 'No category',
-                              location: { 
+                              description:
+                                ranking.note || "No description available",
+                              category: "No category",
+                              location: {
                                 address: ranking.spotLocation,
                                 coordinates: {
                                   latitude: 0,
-                                  longitude: 0
-                                }
+                                  longitude: 0,
+                                },
                               },
                               photos: [],
                               amenities: [],
@@ -414,20 +626,20 @@ export default function Profile() {
                               reviewCount: 1,
                               totalRatings: 1,
                               bestTimeToVisit: [],
-                              difficulty: 'varies',
-                              distance: '',
-                              duration: '',
-                              elevation: '',
+                              difficulty: "varies",
+                              distance: "",
+                              duration: "",
+                              elevation: "",
                               isVerified: false,
-                              npsCode: '',
-                              website: '',
+                              npsCode: "",
+                              website: "",
                               tags: [],
                               createdAt: ranking.createdAt || new Date(),
-                              createdBy: user?.uid || '',
-                              source: 'USER_ADDED',
-                              updatedAt: ranking.updatedAt || new Date()
-                            })
-                          }
+                              createdBy: user?.uid || "",
+                              source: "USER_ADDED",
+                              updatedAt: ranking.updatedAt || new Date(),
+                            }),
+                          },
                         });
                       }
                     }}
@@ -438,11 +650,12 @@ export default function Profile() {
             ) : (
               <View style={styles.noRankingsContainer}>
                 <Text style={styles.noRankingsText}>No rankings yet</Text>
-                <Text style={styles.noRankingsSubtext}>Visit spots and rate them to see your rankings here</Text>
+                <Text style={styles.noRankingsSubtext}>
+                  Visit spots and rate them to see your rankings here
+                </Text>
               </View>
             )}
           </View>
-
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -454,16 +667,43 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: PALETTE.bg },
   scroll: { paddingBottom: 40 },
 
-  brandRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingTop: 8 },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
   brandLogo: { fontSize: 25, marginRight: 8 },
-  brandName: { fontSize: 25, fontWeight: "700", color: "#7DA384", letterSpacing: 0.3 },
+  brandName: {
+    fontSize: 25,
+    fontWeight: "700",
+    color: "#7DA384",
+    letterSpacing: 0.3,
+  },
 
   avatarWrap: { alignItems: "center", marginTop: 8 },
-  avatar: { width: 124, height: 124, borderRadius: 62, backgroundColor: "#EEE" },
+  avatar: {
+    width: 124,
+    height: 124,
+    borderRadius: 62,
+    backgroundColor: "#7DA384",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarText: {
+    fontSize: 48,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
 
   centerWrap: { alignItems: "center", marginTop: 12 },
   handle: { fontSize: 22, fontWeight: "700", color: "#424242" },
-  joined: { fontSize: 16, color: PALETTE.subtext, marginTop: 4, textTransform: "lowercase" },
+  joined: {
+    fontSize: 16,
+    color: PALETTE.subtext,
+    marginTop: 4,
+    textTransform: "lowercase",
+  },
 
   buttonRow: {
     flexDirection: "row",
@@ -480,7 +720,18 @@ const styles = StyleSheet.create({
     borderColor: "#DED7CB",
     backgroundColor: "#F8F4EE",
   },
-  ghostButtonText: { color: "#6B6B6B", fontWeight: "600", textTransform: "lowercase" },
+  ghostButtonText: {
+    color: "#6B6B6B",
+    fontWeight: "600",
+    textTransform: "lowercase",
+  },
+  logoutGhostButton: {
+    backgroundColor: "#FFE6E6",
+    borderColor: "#FFB3B3",
+  },
+  logoutGhostButtonText: {
+    color: "#D63031",
+  },
 
   statsRow: {
     flexDirection: "row",
@@ -490,7 +741,12 @@ const styles = StyleSheet.create({
   },
   statItem: { alignItems: "center", minWidth: 90 },
   statValue: { fontSize: 20, fontWeight: "800", color: "#3E3E3E" },
-  statLabel: { fontSize: 13, color: "#6E6E6E", marginTop: 2, textAlign: "center" },
+  statLabel: {
+    fontSize: 13,
+    color: "#6E6E6E",
+    marginTop: 2,
+    textAlign: "center",
+  },
 
   section: {
     marginTop: 18,
@@ -512,7 +768,12 @@ const styles = StyleSheet.create({
   rowIcon: { fontSize: 18, width: 26, textAlign: "center", color: "#5E5E5E" },
   rowLabel: { fontSize: 16, color: "#2F2F2F", fontWeight: "700" },
   rowRight: { flexDirection: "row", alignItems: "center" },
-  rowValue: { fontSize: 16, color: "#4B4B4B", marginRight: 8, fontWeight: "700" },
+  rowValue: {
+    fontSize: 16,
+    color: "#4B4B4B",
+    marginRight: 8,
+    fontWeight: "700",
+  },
   chevron: { fontSize: 24, color: "#9B9B9B", marginTop: -2 },
 
   divider: { height: 1, backgroundColor: PALETTE.divider, marginLeft: 16 },
@@ -552,7 +813,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 10,
   },
-  socialItem: { fontSize: 14, color: "#333", marginBottom: 2, fontWeight: "600" },
+  socialItem: {
+    fontSize: 14,
+    color: "#333",
+    marginBottom: 2,
+    fontWeight: "600",
+  },
 
   notesWrap: { marginTop: 8 },
   notesLabel: { fontSize: 13, color: "#777", marginBottom: 2 },
@@ -560,8 +826,8 @@ const styles = StyleSheet.create({
 
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: PALETTE.bg,
   },
   loadingText: {
@@ -571,17 +837,44 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: PALETTE.bg,
     paddingHorizontal: 20,
   },
   errorText: {
     fontSize: 16,
     color: PALETTE.subtext,
-    textAlign: 'center',
+    textAlign: "center",
+    marginBottom: 20,
   },
-  
+  errorButtonContainer: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  retryButton: {
+    backgroundColor: PALETTE.accent,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  logoutButton: {
+    backgroundColor: "#FF6B6B",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  logoutButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
   // Rankings section
   rankingsSection: {
     marginTop: 20,
@@ -603,19 +896,18 @@ const styles = StyleSheet.create({
     backgroundColor: PALETTE.card,
     borderRadius: 12,
     padding: 24,
-    alignItems: 'center',
+    alignItems: "center",
   },
   noRankingsText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     color: PALETTE.text,
     marginBottom: 4,
   },
   noRankingsSubtext: {
     fontSize: 14,
     color: PALETTE.subtext,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 18,
   },
-
 });

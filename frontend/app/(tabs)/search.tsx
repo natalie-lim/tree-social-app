@@ -1,6 +1,7 @@
 import { Spot as SpotCardType } from "@/components/SpotCard";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -15,61 +16,26 @@ import {
   View,
 } from "react-native";
 
-// ---- Firestore (v9 modular) ----
+// Import search service
 import {
-  collection,
-  endAt,
-  getDocs,
-  orderBy,
-  query as q,
-  limit as qLimit,
-  startAt,
-} from "firebase/firestore";
-import { db } from "../../config/firebase"; // <-- your initialized Firestore instance
+  normalize,
+  ResultItem,
+  searchFirestore,
+  TabKey,
+  useDebounced,
+} from "../../components/searchService";
 
 const COLORS = {
-  text: "#111827",
-  subtext: "#6B7280",
-  border: "#D1D5DB",
-  bg: "#FFFFFF",
-  accent: "#6FA076",
+  bg: "#FFF6EC", // soft cream
+  brand: "#2F4A43", // deep green (logo / active)
+  chip: "#1F5B4E", // dark teal for buttons
+  chipText: "#FFFFFF",
+  text: "#222326",
+  sub: "#6F7276",
+  inputBg: "#F2F4F5",
+  border: "#E3E6E8",
 };
-const BG = "#FFFAF0";
-
-type TabKey = "locations" | "members";
-
-type Spot = {
-  id: string;
-  name: string;
-  name_lower?: string;
-  city?: string;
-  category?: string;
-};
-type UserLite = {
-  id: string;
-  handle?: string;
-  username_lower?: string;
-  displayName?: string;
-  rank?: number;
-  followers?: number;
-};
-
-type ResultItem = {
-  id: string;
-  title: string;
-  subtitle?: string;
-  spotData?: SpotCardType;
-};
-
-function toTitleCase(str: string) {
-  return str
-    .toLowerCase()
-    .split(" ")
-    .filter(Boolean) // remove extra spaces
-    .map(w => w[0].toUpperCase() + w.slice(1))
-    .join(" ");
-}
-
+const BG = "#FFF6EC";
 
 export default function SearchScreen() {
   const [query, setQuery] = useState("");
@@ -83,11 +49,7 @@ export default function SearchScreen() {
   const [error, setError] = useState<string | null>(null);
 
   // Recents (very simple in-memory; persist to AsyncStorage if you like)
-  const [recents, setRecents] = useState<ResultItem[]>([
-    { id: "u1", title: "Will Levy", subtitle: "@wlevy" },
-    { id: "u2", title: "Bell Tran", subtitle: "@belltran" },
-    { id: "u3", title: "Jane Doe", subtitle: "@janedoe" },
-  ]);
+  const [recents, setRecents] = useState<ResultItem[]>([]);
 
   // Simple result cache: key = `${tab}|${q}`
   const cacheRef = useRef<Record<string, ResultItem[]>>({});
@@ -165,32 +127,31 @@ export default function SearchScreen() {
   const handleSpotPress = (spot: SpotCardType) => {
     setOverlayOpen(false);
     router.push({
-      pathname: '/spot-detail',
+      pathname: "/spot-detail",
       params: {
-        spotData: JSON.stringify(spot)
-      }
+        spotData: JSON.stringify(spot),
+      },
     });
   };
 
   return (
     <SafeAreaView style={styles.safe}>
       <ThemedView style={styles.container}>
-        <ThemedText type="title" style={styles.header}>Search</ThemedText>
+        <ThemedText type="title" style={styles.header}>
+          Search
+        </ThemedText>
 
-        {/* Clean search bar */}
+        {/* Search bar styled like feed.tsx */}
         <View style={styles.searchBarContainer}>
-          <View style={[
-            styles.searchInputContainer,
-            isFocused && styles.searchInputFocused
-          ]}>
-            <Text style={styles.searchIcon}>🔍</Text>
+          <View style={styles.searchWrap}>
+            <Ionicons name="search-outline" size={18} color={COLORS.sub} />
             <TextInput
               value={query}
               onChangeText={setQuery}
               onFocus={handleFocus}
               onBlur={handleBlur}
               placeholder="Search places, people, and content..."
-              placeholderTextColor={COLORS.subtext}
+              placeholderTextColor={COLORS.sub}
               style={styles.searchInput}
               returnKeyType="search"
               clearButtonMode="while-editing"
@@ -203,25 +164,26 @@ export default function SearchScreen() {
         {/* Clean description */}
         <View style={styles.descriptionContainer}>
           <ThemedText style={styles.descriptionText}>
-            Find places, connect with people, and discover content from our community.
+            Find places, connect with people, and discover content from our
+            community.
           </ThemedText>
-          
+
           {/* Subtle quick actions */}
           <View style={styles.quickActionsContainer}>
             <View style={styles.quickActionsRow}>
-              <Pressable 
+              <Pressable
                 style={styles.quickActionPill}
                 onPress={() => setQuery("coffee")}
               >
                 <ThemedText style={styles.quickActionText}>Coffee</ThemedText>
               </Pressable>
-              <Pressable 
+              <Pressable
                 style={styles.quickActionPill}
                 onPress={() => setQuery("hiking")}
               >
                 <ThemedText style={styles.quickActionText}>Hiking</ThemedText>
               </Pressable>
-              <Pressable 
+              <Pressable
                 style={styles.quickActionPill}
                 onPress={() => setQuery("restaurants")}
               >
@@ -303,7 +265,7 @@ export default function SearchScreen() {
                       ? "Search name or place…"
                       : "Search name or handle…"
                   }
-                  placeholderTextColor={COLORS.subtext}
+                  placeholderTextColor={COLORS.sub}
                   style={styles.overlayInput}
                   returnKeyType="search"
                   autoCorrect={false}
@@ -337,51 +299,6 @@ export default function SearchScreen() {
                         </Pressable>
                       ))}
                     </ScrollView>
-
-                    <View style={styles.sectionHeaderRow}>
-                      <Text style={styles.sectionTitle}>Suggested for you</Text>
-                      <Pressable>
-                        <Text style={styles.link}>See all</Text>
-                      </Pressable>
-                    </View>
-
-                    {tab === "locations" ? (
-                      <>
-                        <ResultRow
-                          title="Cafe Lumen"
-                          subtitle="Cambridge • Coffee"
-                          onPress={onSelectResult}
-                        />
-                        <ResultRow
-                          title="Shiso Kitchen"
-                          subtitle="Somerville • Japanese"
-                          onPress={onSelectResult}
-                        />
-                        <ResultRow
-                          title="Riverview Diner"
-                          subtitle="Boston • American"
-                          onPress={onSelectResult}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <ResultRow
-                          title="@charlie"
-                          subtitle="Rank #12 • 240 followers"
-                          onPress={onSelectResult}
-                        />
-                        <ResultRow
-                          title="@mia"
-                          subtitle="Rank #33 • 120 followers"
-                          onPress={onSelectResult}
-                        />
-                        <ResultRow
-                          title="@alex"
-                          subtitle="Rank #58 • 90 followers"
-                          onPress={onSelectResult}
-                        />
-                      </>
-                    )}
                   </>
                 ) : (
                   <>
@@ -390,16 +307,14 @@ export default function SearchScreen() {
                         {loading ? "Searching…" : error ? "Error" : "Results"}
                       </Text>
                       {!!debounced && (
-                        <Text style={{ color: COLORS.subtext }}>
-                          {debounced}
-                        </Text>
+                        <Text style={{ color: COLORS.sub }}>{debounced}</Text>
                       )}
                     </View>
 
                     {error ? (
                       <Text style={{ color: "#B91C1C" }}>{error}</Text>
                     ) : results.length === 0 && !loading ? (
-                      <Text style={{ color: COLORS.subtext }}>No matches.</Text>
+                      <Text style={{ color: COLORS.sub }}>No matches.</Text>
                     ) : (
                       results.map((r) => {
                         if (tab === "locations" && r.spotData) {
@@ -432,127 +347,6 @@ export default function SearchScreen() {
       </ThemedView>
     </SafeAreaView>
   );
-}
-
-function useDebounced<T>(value: T, ms: number) {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setV(value), ms);
-    return () => clearTimeout(t);
-  }, [value, ms]);
-  return v;
-}
-
-// Strip diacritics + lowercase to match your `*_lower` fields
-function normalize(s: string) {
-  return (
-    s
-      .normalize("NFKD")
-      // @ts-ignore — Unicode property escapes supported in Hermes/JSI RN 0.72+
-      .replace(/\p{Diacritic}/gu, "")
-      .toLowerCase()
-      .trim()
-  );
-}
-
-/**
- * Firestore prefix search
- * - locations -> collection("spots"), orderBy("name_lower")
- * - members   -> collection("users"), orderBy("username_lower")
- * Returns a unified ResultItem[]
- *
- * NOTE: Ensure you have composite indexes if you add extra where() later.
- */
-async function searchFirestore(tab: TabKey, queryInput: string): Promise<ResultItem[]> {
-  if (!queryInput) return [];
-
-  console.log("Searching for:", queryInput);
-
-  if (tab === "locations") {
-    const ref = collection(db, "spots");
-    const formattedQuery = toTitleCase(queryInput);
-    
-    const queryRef = q(
-      ref,
-      orderBy("name"),
-      startAt(formattedQuery),
-      endAt(formattedQuery + "\uf8ff"),
-      qLimit(20)
-    );
-    const snap = await getDocs(queryRef);
-    // console.log("Found documents:", snap.docs.length);
-    return snap.docs.map(d => {
-      const data = d.data() as SpotCardType;
-      // console.log("Document data:", data);
-      // Ensure the spot data includes the document ID
-      const spotDataWithId = {
-        ...data,
-        id: d.id || `spot_${Date.now()}_${Math.random()}`
-      };
-      return { 
-        id: d.id || `spot_${Date.now()}_${Math.random()}`, 
-        title: data?.name || "(untitled)", 
-        subtitle: buildLocationSubtitle(data),
-        spotData: spotDataWithId // Add the full spot data with ID
-      };
-    });
-  } else {
-    const ref = collection(db, "users");
-    const formattedQuery = toTitleCase(queryInput);
-    
-    const queryRef = q(
-      ref,
-      orderBy("displayName"),
-      startAt(formattedQuery),
-      endAt(formattedQuery + "\uf8ff"),
-      qLimit(20)
-    );
-    const snap = await getDocs(queryRef);
-    console.log("Found users:", snap.docs.length);
-    return snap.docs.map(d => {
-      const u = d.data() as UserLite;
-      const title = u?.handle ? `@${u.handle}` : u?.displayName || "(user)";
-      const subtitle =
-        u?.displayName && u?.handle
-          ? `${u.displayName}`
-          : u?.followers || u?.rank
-          ? `Rank #${u.rank ?? "-"} • ${u.followers ?? 0} followers`
-          : undefined;
-      return { 
-        id: d.id || `user_${Date.now()}_${Math.random()}`, 
-        title, 
-        subtitle 
-      };
-    });
-  }
-}
-
-function buildLocationSubtitle(s: SpotCardType) {
-  if (!s) return undefined;
-  const bits = [];
-  
-  // Add location
-  if (s.location?.address) {
-    bits.push(s.location.address);
-  }
-  
-  // Add category
-  if (s.category) {
-    const categoryFormatted = s.category.replace(/_/g, ' ').toUpperCase();
-    bits.push(categoryFormatted);
-  }
-  
-  // Add rating if available
-  if (s.averageRating > 0) {
-    bits.push(`⭐ ${s.averageRating.toFixed(1)}`);
-  }
-  
-  // Add verification badge
-  if (s.isVerified) {
-    bits.push('✓ Verified');
-  }
-  
-  return bits.length ? bits.join(" • ") : undefined;
 }
 
 /* ---------- Presentational ---------- */
@@ -623,33 +417,24 @@ const styles = StyleSheet.create({
     textTransform: "lowercase",
   },
 
-  searchBarContainer: { 
+  searchBarContainer: {
     marginBottom: 20,
   },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.bg,
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
-    paddingHorizontal: 16,
-    height: 48,
-  },
-  searchInputFocused: {
-    borderColor: COLORS.accent,
-    borderWidth: 2,
+    paddingHorizontal: 12,
+    height: 44,
   },
   searchInput: {
     flex: 1,
+    marginLeft: 8,
     fontSize: 16,
     color: COLORS.text,
-    marginLeft: 12,
-    paddingVertical: 0,
-  },
-  searchIcon: {
-    fontSize: 18,
-    color: COLORS.accent,
   },
   descriptionContainer: {
     marginBottom: 24,
@@ -657,28 +442,26 @@ const styles = StyleSheet.create({
   descriptionText: {
     fontSize: 16,
     lineHeight: 24,
-    color: COLORS.subtext,
+    color: COLORS.sub,
     marginBottom: 16,
   },
   quickActionsContainer: {
     marginTop: 4,
   },
   quickActionsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   quickActionPill: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
+    backgroundColor: COLORS.chip,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   quickActionText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.accent,
+    fontWeight: "700",
+    color: COLORS.chipText,
   },
 
   overlay: {
@@ -713,7 +496,7 @@ const styles = StyleSheet.create({
   brandText: {
     fontSize: 28,
     fontWeight: "800",
-    color: COLORS.accent,
+    color: COLORS.brand,
     textTransform: "lowercase",
     letterSpacing: 0.3,
   },
@@ -730,10 +513,10 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 16,
     fontWeight: "700",
-    color: COLORS.subtext,
+    color: COLORS.sub,
   },
   tabLabelActive: {
-    color: COLORS.accent,
+    color: COLORS.brand,
   },
   tabUnderline: {
     marginTop: 10,
@@ -742,7 +525,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   tabUnderlineActive: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.brand,
   },
 
   overlaySearchWrap: {
@@ -771,7 +554,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   sectionTitle: { fontSize: 18, fontWeight: "800", color: COLORS.text },
-  link: { fontSize: 14, fontWeight: "800", color: COLORS.accent },
+  link: { fontSize: 14, fontWeight: "800", color: COLORS.brand },
 });
 
 const rowStyles = StyleSheet.create({
@@ -781,11 +564,11 @@ const rowStyles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
-    borderBottomColor: "#EFEFEF",
+    borderBottomColor: COLORS.border,
   },
   title: { fontSize: 16, fontWeight: "700", color: COLORS.text },
-  subtitle: { fontSize: 14, color: "#6B7280", marginTop: 2 },
-  chevron: { fontSize: 24, color: "#9CA3AF", marginLeft: 8 },
+  subtitle: { fontSize: 14, color: COLORS.sub, marginTop: 2 },
+  chevron: { fontSize: 24, color: COLORS.sub, marginLeft: 8 },
 });
 
 const recentStyles = StyleSheet.create({
@@ -799,11 +582,11 @@ const recentStyles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: COLORS.inputBg,
     marginBottom: 6,
   },
   name: { fontSize: 14, fontWeight: "700", color: COLORS.text },
-  handle: { fontSize: 12, color: "#6B7280" },
+  handle: { fontSize: 12, color: COLORS.sub },
   closeDot: {
     position: "absolute",
     top: 0,
@@ -811,10 +594,10 @@ const recentStyles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: COLORS.inputBg,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: COLORS.border,
   },
 });

@@ -163,6 +163,26 @@ export async function searchFirestore(
     });
     console.log("=================================");
 
+    // Debug: Find the specific user we're looking for
+    const targetUser = snap.docs.find((d) => {
+      const u = d.data() as UserLite;
+      return (
+        u?.displayName === queryInput ||
+        u?.displayName?.toLowerCase() === queryInput.toLowerCase()
+      );
+    });
+
+    if (targetUser) {
+      console.log("=== TARGET USER FOUND ===");
+      console.log(
+        "Target user data:",
+        JSON.stringify(targetUser.data(), null, 2)
+      );
+      console.log("=========================");
+    } else {
+      console.log("Target user not found in fetched data");
+    }
+
     // Filter users where displayName starts with the normalized query (case-insensitive)
     // and exclude the current user if provided
     const filteredUsers = snap.docs

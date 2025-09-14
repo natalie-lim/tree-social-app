@@ -112,6 +112,7 @@ export default function RankingPage() {
       // Create ranking data
       const rankingData = {
         userId: currentUser.uid,
+        displayName: currentUser.displayName,
         spotId: safeSpot.id,
         spotName: safeSpot.name,
         spotLocation: safeSpot.location?.address || 'Unknown Location',

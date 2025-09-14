@@ -57,7 +57,7 @@ export default function Feed() {
               .map((ranking: any) => ranking.rankingId)
               .filter(Boolean);
             allRankingIds.push(...userRankingIds);
-          } 
+          }
         } catch (err) {
           console.log(
             `Error accessing rankings for user ${user.id}:`,
@@ -103,23 +103,42 @@ export default function Feed() {
       // Step 5: Get all spots and match by name
       const allSpots = await firestoreService.getAll("spots");
 
-      // Step 6: Create spots with user information from rankings collection
+      // Step 6: Create spots with user information from users collection
       const spotsWithUsers = [];
       for (const ranking of allRankings) {
         const rankingData = ranking as any; // Type assertion to access ranking properties
         const spotId = rankingData.spotId;
-        if (spotId) {
+        const userId = rankingData.userId; // Use userId field from ranking document
+        console.log(`Ranking data:`, rankingData); // Debug: see what's in the ranking document
+        console.log(`Extracted userId: ${userId}, spotId: ${spotId}`); // Debug: see extracted values
+
+        if (spotId && userId) {
           const matchingSpot = allSpots.find((spot) => spot.id === spotId);
           if (matchingSpot) {
+            // Fetch user data from users collection
+            let userData = null;
+            try {
+              userData = await firestoreService.read("users", userId);
+              console.log(`Fetched user data for ${userId}:`, userData); // Debug: see user data
+              const userDataDebug = userData as any;
+              console.log(
+                `User displayName: ${userDataDebug?.displayName}, email: ${userDataDebug?.email}`
+              ); // Debug: see specific fields
+            } catch (err) {
+              console.log(`Error fetching user ${userId}:`, err);
+            }
+
+            const userDataTyped = userData as any; // Type assertion to access user properties
+            const finalUserName =
+              userDataTyped?.displayName || userDataTyped?.email || "User";
+            console.log(`Final userName for ${userId}: "${finalUserName}"`); // Debug: see final result
+
             spotsWithUsers.push({
               ...matchingSpot,
               rankingUser: {
-                userId: rankingData.createdBy || rankingData.userId,
-                userName: rankingData.userName || rankingData.createdBy,
-                userDisplayName:
-                  rankingData.userDisplayName ||
-                  rankingData.userName ||
-                  rankingData.createdBy,
+                userId: userId,
+                userName: finalUserName,
+                userDisplayName: finalUserName,
                 userNotes:
                   rankingData.note ||
                   rankingData.notes ||

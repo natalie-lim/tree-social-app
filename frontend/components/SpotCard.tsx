@@ -74,7 +74,6 @@ export function SpotCard({
     let alive = true;
 
     async function loadDisplayName() {
-  
       // 1) Preferred: lookup by userId field in users collection
       if (rankingUserId) {
         try {
@@ -109,6 +108,14 @@ export function SpotCard({
 
   const accentColor = "#6FA076";
 
+  // Convert to title case
+  const toTitleCase = (name: string) => {
+    return name.replace(
+      /\w\S*/g,
+      (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+    );
+  };
+
   return (
     <Pressable style={[styles.card, style]} onPress={() => onPress?.(spot)}>
       <View style={styles.cardContent}>
@@ -117,7 +124,11 @@ export function SpotCard({
           {/* Left side - Spot info */}
           <View style={styles.spotInfo}>
             <ThemedText style={styles.spotName} numberOfLines={1}>
-              {spot.name}
+              <ThemedText style={styles.boldText}>
+                {toTitleCase(resolvedName || "User")}
+              </ThemedText>{" "}
+              <ThemedText style={styles.normalText}>explored</ThemedText>{" "}
+              <ThemedText style={styles.boldText}>{spot.name}</ThemedText>
             </ThemedText>
             <ThemedText style={styles.spotLocation} numberOfLines={1}>
               {spot.location.address}
@@ -133,15 +144,6 @@ export function SpotCard({
             </View>
           )}
         </View>
-
-        {/* User Section */}
-        {resolvedName && (
-          <View style={styles.userSection}>
-            <ThemedText style={styles.userText}>
-              {resolvedName}'s ranking
-            </ThemedText>
-          </View>
-        )}
 
         {/* User Notes Section */}
         <View style={styles.notesSection}>
@@ -207,6 +209,12 @@ const styles = StyleSheet.create({
   spotLocation: {
     fontSize: 14,
     color: "#6B7280",
+  },
+  boldText: {
+    fontWeight: "700",
+  },
+  normalText: {
+    fontWeight: "400",
   },
   ratingCircle: {
     width: 40,

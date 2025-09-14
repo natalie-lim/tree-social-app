@@ -78,14 +78,9 @@ export default function Feed() {
               ...rankingDoc,
               id: rankingId,
             });
-          } else {
-            console.log(`Ranking document ${rankingId} not found`);
-          }
+          } 
         } catch (err) {
-          console.log(
-            `Error fetching ranking ${rankingId}:`,
-            err instanceof Error ? err.message : String(err)
-          );
+        
         }
       }
 
@@ -111,13 +106,10 @@ export default function Feed() {
         const rankingData = ranking as any; // Type assertion to access ranking properties
         const spotId = rankingData.spotId;
         const userId = rankingData.userId; // Use userId field from ranking document
-        console.log(`Ranking data:`, rankingData); // Debug: see what's in the ranking document
-        console.log(`Extracted userId: ${userId}, spotId: ${spotId}`); // Debug: see extracted values
 
         if (spotId && userId) {
           // Skip if this ranking belongs to the current user
           if (user && userId === user.uid) {
-            console.log(`Skipping current user's ranking for spot ${spotId}`);
             continue;
           }
 
@@ -127,19 +119,13 @@ export default function Feed() {
             let userData = null;
             try {
               userData = await firestoreService.read("users", userId);
-              console.log(`Fetched user data for ${userId}:`, userData); // Debug: see user data
               const userDataDebug = userData as any;
-              console.log(
-                `User displayName: ${userDataDebug?.displayName}, email: ${userDataDebug?.email}`
-              ); // Debug: see specific fields
             } catch (err) {
-              console.log(`Error fetching user ${userId}:`, err);
             }
 
             const userDataTyped = userData as any; // Type assertion to access user properties
             const finalUserName =
               userDataTyped?.displayName || userDataTyped?.email || "User";
-            console.log(`Final userName for ${userId}: "${finalUserName}"`); // Debug: see final result
 
             spotsWithUsers.push({
               ...matchingSpot,
@@ -309,7 +295,7 @@ const styles = StyleSheet.create({
   searchWrap: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.inputBg,
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,

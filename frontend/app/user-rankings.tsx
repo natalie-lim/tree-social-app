@@ -140,7 +140,6 @@ export default function UserRankingsPage() {
         return b.rating - a.rating;
       });
 
-      console.log('Fetched full user rankings:', sortedRankings);
       setUserRankings(sortedRankings);
       setError(null);
     } catch (err) {

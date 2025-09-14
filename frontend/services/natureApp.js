@@ -1,5 +1,5 @@
-import { firestoreService } from './firestore';
 import { Timestamp } from 'firebase/firestore';
+import { firestoreService } from './firestore';
 
 // Nature App Categories
 export const NATURE_CATEGORIES = {
@@ -77,6 +77,67 @@ export const userService = {
       { field: 'userId', operator: '==', value: userId }
     ]);
     return users.length > 0 ? users[0] : null;
+  },
+
+  async updateUserStats(userId) {
+    try {
+      // Get user's reviews count
+      const userReviews = await firestoreService.query('reviews', [
+        { field: 'userId', operator: '==', value: userId }
+      ]);
+      
+      // Get user's activities count (spots visited)
+      const userActivities = await firestoreService.query('activities', [
+        { field: 'userId', operator: '==', value: userId },
+        { field: 'type', operator: '==', value: 'spot_visit' }
+      ]);
+      
+      // Calculate average rating from reviews
+      const averageRating = userReviews.length > 0 
+        ? userReviews.reduce((sum, review) => sum + (review.rating || 0), 0) / userReviews.length
+        : 0;
+      
+      // Update user profile with new stats
+      const userProfile = await this.getUserProfile(userId);
+      if (userProfile) {
+        await firestoreService.update('users', userProfile.id, {
+          totalSpots: userActivities.length,
+          totalReviews: userReviews.length,
+          averageRating: Math.round(averageRating * 10) / 10,
+          updatedAt: Timestamp.now()
+        });
+      }
+    } catch (error) {
+      console.error('Error updating user stats:', error);
+    }
+  },
+
+  async incrementUserSpots(userId) {
+    try {
+      const userProfile = await this.getUserProfile(userId);
+      if (userProfile) {
+        await firestoreService.update('users', userProfile.id, {
+          totalSpots: (userProfile.totalSpots || 0) + 1,
+          updatedAt: Timestamp.now()
+        });
+      }
+    } catch (error) {
+      console.error('Error incrementing user spots:', error);
+    }
+  },
+
+  async incrementUserReviews(userId) {
+    try {
+      const userProfile = await this.getUserProfile(userId);
+      if (userProfile) {
+        await firestoreService.update('users', userProfile.id, {
+          totalReviews: (userProfile.totalReviews || 0) + 1,
+          updatedAt: Timestamp.now()
+        });
+      }
+    } catch (error) {
+      console.error('Error incrementing user reviews:', error);
+    }
   }
 };
 
@@ -137,6 +198,11 @@ export const reviewsService = {
     
     // Update spot's rating
     await this.updateSpotRating(reviewData.spotId);
+    
+    // Update user's review count
+    if (reviewData.userId) {
+      await userService.incrementUserReviews(reviewData.userId);
+    }
     
     return reviewId;
   },

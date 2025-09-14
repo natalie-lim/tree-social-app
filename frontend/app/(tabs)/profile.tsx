@@ -1,8 +1,7 @@
 // Profile.tsx
-import React from "react";
-
-
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   SafeAreaView,
   ScrollView,
@@ -11,6 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../../contexts/AuthContext";
+import { userService } from "../../services/natureApp";
 
 type Stat = { label: string; value: string | number };
 type ListRowProps = { icon?: string; label: string; value?: string | number; onPress?: () => void };
@@ -52,6 +53,98 @@ const ListRow = ({ icon = "✓", label, value, onPress }: ListRowProps) => (
 );
 
 export default function Profile() {
+  const { user, loading: authLoading } = useAuth();
+  const [userProfile, setUserProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!user) {
+        setProfileLoading(false);
+        return;
+      }
+
+      try {
+        setProfileLoading(true);
+        
+        // First, update user stats from actual data
+        await userService.updateUserStats(user.uid);
+        
+        // Then fetch the updated profile
+        const profile = await userService.getUserProfile(user.uid);
+        console.log('Fetched user profile:', profile); // Debug log
+        setUserProfile(profile);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching user profile:', err);
+        setError('Failed to load profile');
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, [user]);
+
+  // Add refresh functionality
+  const refreshProfile = async () => {
+    if (!user) return;
+    
+    try {
+      setProfileLoading(true);
+      
+      // Update user stats from actual data
+      await userService.updateUserStats(user.uid);
+      
+      // Then fetch the updated profile
+      const profile = await userService.getUserProfile(user.uid);
+      console.log('Refreshed user profile:', profile); // Debug log
+      setUserProfile(profile);
+    } catch (err) {
+      console.error('Error refreshing profile:', err);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const formatJoinDate = (timestamp) => {
+    if (!timestamp) return 'joined recently';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return `joined ${date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+  };
+
+  if (authLoading || profileLoading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={PALETTE.accent} />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Please log in to view your profile</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.root}>
@@ -64,17 +157,27 @@ export default function Profile() {
 
           {/* Avatar */}
           <View style={styles.avatarWrap}>
-            <Image source={{ uri: AVATAR_URI }} style={styles.avatar} />
+            <Image 
+              source={{ 
+                uri: userProfile?.profilePhoto || user?.photoURL || AVATAR_URI 
+              }} 
+              style={styles.avatar} 
+            />
           </View>
 
           {/* Handle + joined */}
           <View style={styles.centerWrap}>
-            <Text style={styles.handle}>@hackmit</Text>
-            <Text style={styles.joined}>joined september 2025</Text>
+            <Text style={styles.handle}>@{userProfile?.displayName || user?.displayName || 'user'}</Text>
+            <Text style={styles.joined}>
+              {userProfile?.joinedAt ? formatJoinDate(userProfile.joinedAt) : 'joined recently'}
+            </Text>
           </View>
 
           {/* Action buttons */}
           <View style={styles.buttonRow}>
+            <TouchableOpacity style={[styles.ghostButton]} onPress={refreshProfile}>
+              <Text style={styles.ghostButtonText}>refresh</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={[styles.ghostButton]}>
               <Text style={styles.ghostButtonText}>edit profile</Text>
             </TouchableOpacity>
@@ -85,18 +188,38 @@ export default function Profile() {
 
           {/* Stats */}
           <View style={styles.statsRow}>
-            <StatItem label="followers" value={101} />
-            <StatItem label="following" value={101} />
-            <StatItem label="rank on leaflet" value="#101" />
+            <StatItem label="followers" value={userProfile?.followerCount || 0} />
+            <StatItem label="following" value={userProfile?.followingCount || 0} />
+            <StatItem label="spots visited" value={userProfile?.totalSpots || 0} />
           </View>
+
+          {/* Debug info - remove this in production */}
+          {__DEV__ && userProfile && (
+            <View style={styles.debugContainer}>
+              <Text style={styles.debugText}>Debug: totalSpots={userProfile.totalSpots}, totalReviews={userProfile.totalReviews}</Text>
+              <TouchableOpacity 
+                style={styles.testButton} 
+                onPress={async () => {
+                  // Create a test activity (spot visit)
+                  await userService.incrementUserSpots(user.uid);
+                  // Create a test review
+                  await userService.incrementUserReviews(user.uid);
+                  // Refresh profile
+                  await refreshProfile();
+                }}
+              >
+                <Text style={styles.testButtonText}>Test: Add Spot + Review</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Lists */}
           <View style={styles.section}>
-            <ListRow icon="✔︎" label="Been" value={912} />
+            <ListRow icon="✔︎" label="Been" value={userProfile?.totalSpots || 0} />
             <View style={styles.divider} />
-            <ListRow icon="🔖" label="Want to Go" value={101} />
+            <ListRow icon="⭐" label="Reviews" value={userProfile?.totalReviews || 0} />
             <View style={styles.divider} />
-            <ListRow icon="❤️" label="Recs for You" />
+            <ListRow icon="🏆" label="Average Rating" value={userProfile?.averageRating ? userProfile.averageRating.toFixed(1) : '0.0'} />
           </View>
 
           {/* Activity card */}
@@ -241,4 +364,55 @@ const styles = StyleSheet.create({
   notesWrap: { marginTop: 8 },
   notesLabel: { fontSize: 13, color: "#777", marginBottom: 2 },
   notesText: { fontSize: 15, fontStyle: "italic", color: "#333" },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: PALETTE.bg,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: PALETTE.subtext,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: PALETTE.bg,
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: PALETTE.subtext,
+    textAlign: 'center',
+  },
+  debugContainer: {
+    backgroundColor: '#FFF3E0',
+    padding: 12,
+    margin: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FFB74D',
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#E65100',
+    fontFamily: 'monospace',
+    marginBottom: 8,
+  },
+  testButton: {
+    backgroundColor: PALETTE.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  testButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });

@@ -1,5 +1,7 @@
+import { Spot as SpotCardType } from "@/components/SpotCard";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { router } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -56,6 +58,7 @@ type ResultItem = {
   id: string;
   title: string;
   subtitle?: string;
+  spotData?: SpotCardType;
 };
 
 function toTitleCase(str: string) {
@@ -72,6 +75,7 @@ export default function SearchScreen() {
   const [query, setQuery] = useState("");
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [tab, setTab] = useState<TabKey>("locations");
+  const [isFocused, setIsFocused] = useState(false);
 
   // Search state
   const [loading, setLoading] = useState(false);
@@ -92,6 +96,15 @@ export default function SearchScreen() {
     // optional: you can force-run search on submit (Enter)
     // but we already run on debounce below
     // runSearch();
+  };
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    setOverlayOpen(true);
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
   };
 
   // Normalize input for the index field ("*_lower")
@@ -148,28 +161,75 @@ export default function SearchScreen() {
     });
   };
 
+  // Navigate to spot detail page
+  const handleSpotPress = (spot: SpotCardType) => {
+    setOverlayOpen(false);
+    router.push({
+      pathname: '/spot-detail',
+      params: {
+        spotData: JSON.stringify(spot)
+      }
+    });
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <ThemedView style={styles.container}>
-        <Text style={styles.header}>Search</Text>
+        <ThemedText type="title" style={styles.header}>Search</ThemedText>
 
-        {/* Top search bar (opens overlay on focus) */}
-        <ThemedView style={styles.searchBarContainer}>
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            onFocus={() => setOverlayOpen(true)}
-            placeholder="Search users, lists, content..."
-            placeholderTextColor="#888"
-            style={styles.searchInput}
-            returnKeyType="search"
-            clearButtonMode="while-editing"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-        </ThemedView>
+        {/* Clean search bar */}
+        <View style={styles.searchBarContainer}>
+          <View style={[
+            styles.searchInputContainer,
+            isFocused && styles.searchInputFocused
+          ]}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
+              placeholder="Search places, people, and content..."
+              placeholderTextColor={COLORS.subtext}
+              style={styles.searchInput}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+          </View>
+        </View>
 
-        <ThemedText>Search for users, lists, and content.</ThemedText>
+        {/* Clean description */}
+        <View style={styles.descriptionContainer}>
+          <ThemedText style={styles.descriptionText}>
+            Find places, connect with people, and discover content from our community.
+          </ThemedText>
+          
+          {/* Subtle quick actions */}
+          <View style={styles.quickActionsContainer}>
+            <View style={styles.quickActionsRow}>
+              <Pressable 
+                style={styles.quickActionPill}
+                onPress={() => setQuery("coffee")}
+              >
+                <ThemedText style={styles.quickActionText}>Coffee</ThemedText>
+              </Pressable>
+              <Pressable 
+                style={styles.quickActionPill}
+                onPress={() => setQuery("hiking")}
+              >
+                <ThemedText style={styles.quickActionText}>Hiking</ThemedText>
+              </Pressable>
+              <Pressable 
+                style={styles.quickActionPill}
+                onPress={() => setQuery("restaurants")}
+              >
+                <ThemedText style={styles.quickActionText}>Food</ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
 
         {/* ================= FULL-SCREEN OVERLAY ================= */}
         {overlayOpen && (
@@ -233,7 +293,6 @@ export default function SearchScreen() {
 
               {/* Overlay search field */}
               <View style={styles.overlaySearchWrap}>
-                <Text style={styles.searchIcon}>🔍</Text>
                 <TextInput
                   autoFocus
                   value={query}
@@ -342,14 +401,27 @@ export default function SearchScreen() {
                     ) : results.length === 0 && !loading ? (
                       <Text style={{ color: COLORS.subtext }}>No matches.</Text>
                     ) : (
-                      results.map((r) => (
-                        <ResultRow
-                          key={`${r.id}`}
-                          title={r.title}
-                          subtitle={r.subtitle}
-                          onPress={onSelectResult}
-                        />
-                      ))
+                      results.map((r) => {
+                        if (tab === "locations" && r.spotData) {
+                          return (
+                            <ResultRow
+                              key={r.id}
+                              title={r.title}
+                              subtitle={r.subtitle}
+                              onPress={() => handleSpotPress(r.spotData!)}
+                            />
+                          );
+                        } else {
+                          return (
+                            <ResultRow
+                              key={r.id}
+                              title={r.title}
+                              subtitle={r.subtitle}
+                              onPress={onSelectResult}
+                            />
+                          );
+                        }
+                      })
                     )}
                   </>
                 )}
@@ -408,14 +480,15 @@ async function searchFirestore(tab: TabKey, queryInput: string): Promise<ResultI
       qLimit(20)
     );
     const snap = await getDocs(queryRef);
-    console.log("Found documents:", snap.docs.length);
+    // console.log("Found documents:", snap.docs.length);
     return snap.docs.map(d => {
-      const data = d.data() as Spot;
-      console.log("Document data:", data);
+      const data = d.data() as SpotCardType;
+      // console.log("Document data:", data);
       return { 
         id: d.id || `spot_${Date.now()}_${Math.random()}`, 
         title: data?.name || "(untitled)", 
-        subtitle: buildLocationSubtitle(data) 
+        subtitle: buildLocationSubtitle(data),
+        spotData: data // Add the full spot data
       };
     });
   } else {
@@ -449,9 +522,31 @@ async function searchFirestore(tab: TabKey, queryInput: string): Promise<ResultI
   }
 }
 
-function buildLocationSubtitle(s: Spot) {
+function buildLocationSubtitle(s: SpotCardType) {
   if (!s) return undefined;
-  const bits = [s.city, s.category].filter(Boolean);
+  const bits = [];
+  
+  // Add location
+  if (s.location?.address) {
+    bits.push(s.location.address);
+  }
+  
+  // Add category
+  if (s.category) {
+    const categoryFormatted = s.category.replace(/_/g, ' ').toUpperCase();
+    bits.push(categoryFormatted);
+  }
+  
+  // Add rating if available
+  if (s.averageRating > 0) {
+    bits.push(`⭐ ${s.averageRating.toFixed(1)}`);
+  }
+  
+  // Add verification badge
+  if (s.isVerified) {
+    bits.push('✓ Verified');
+  }
+  
   return bits.length ? bits.join(" • ") : undefined;
 }
 
@@ -516,23 +611,69 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "800",
-    color: COLORS.text,
     letterSpacing: 1,
-    marginBottom: 12,
+    marginBottom: 16,
     textTransform: "lowercase",
   },
 
-  searchBarContainer: { marginBottom: 20 },
-  searchInput: {
-    height: 45,
+  searchBarContainer: { 
+    marginBottom: 20,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.bg,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
-    paddingHorizontal: 12,
-    backgroundColor: COLORS.bg,
+    paddingHorizontal: 16,
+    height: 48,
+  },
+  searchInputFocused: {
+    borderColor: COLORS.accent,
+    borderWidth: 2,
+  },
+  searchInput: {
+    flex: 1,
     fontSize: 16,
+    color: COLORS.text,
+    marginLeft: 12,
+    paddingVertical: 0,
+  },
+  searchIcon: {
+    fontSize: 18,
+    color: COLORS.accent,
+  },
+  descriptionContainer: {
+    marginBottom: 24,
+  },
+  descriptionText: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: COLORS.subtext,
+    marginBottom: 16,
+  },
+  quickActionsContainer: {
+    marginTop: 4,
+  },
+  quickActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  quickActionPill: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  quickActionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.accent,
   },
 
   overlay: {
@@ -602,13 +743,6 @@ const styles = StyleSheet.create({
   overlaySearchWrap: {
     marginTop: 12,
     position: "relative",
-  },
-  searchIcon: {
-    position: "absolute",
-    left: 12,
-    top: 12,
-    fontSize: 18,
-    color: COLORS.subtext,
   },
   overlayInput: {
     height: 44,

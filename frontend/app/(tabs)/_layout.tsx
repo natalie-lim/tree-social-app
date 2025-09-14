@@ -46,7 +46,6 @@ export default function TabLayout() {
         tabBarButton: HapticTab,
         tabBarActiveTintColor: THEME.cream,
         tabBarInactiveTintColor: THEME.cream,
-        sceneStyle: { backgroundColor: THEME.cream }, // or sceneContainerStyle on older versions
       }}
     >
       <Tabs.Screen
@@ -142,6 +141,7 @@ function CurvyTabBar({
         {
           backgroundColor: theme.green,
           paddingBottom: Math.max(6, insets.bottom - 2),
+          borderTopWidth: 0,
         },
       ]}
     >
@@ -255,6 +255,7 @@ const styles = StyleSheet.create({
     height: BAR_HEIGHT,
     marginHorizontal: H_PADDING, // 0 for edge-to-edge
     overflow: "visible",
+    borderTopWidth: 0,
     ...Platform.select({
       android: { elevation: 6 },
       ios: {

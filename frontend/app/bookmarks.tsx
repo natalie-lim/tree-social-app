@@ -93,7 +93,7 @@ export default function Bookmarks() {
     <SafeAreaView style={styles.container}>
       <ScrollView
         style={styles.screen}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingTop: 40, paddingBottom: 24 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

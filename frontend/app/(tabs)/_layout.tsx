@@ -21,19 +21,19 @@ const THEME = {
 };
 
 // ---- Tunables (adjust as you like)
-const BAR_HEIGHT = 106;          // ↑ bar a bit so unselected icons are fully insid
-const H_PADDING = 0;            // edge-to-edge
+const BAR_HEIGHT = 106; // ↑ bar a bit so unselected icons are fully insid
+const H_PADDING = 0; // edge-to-edge
 
-const ICON_SLOT = 52;           // slot around the icon (stable layout)
-const ICON_GAP_FOCUSED = 8;     // icon→label gap when focused
-const ICON_GAP_IDLE = 4;        // tighter gap when idle (your request)
+const ICON_SLOT = 52; // slot around the icon (stable layout)
+const ICON_GAP_FOCUSED = 8; // icon→label gap when focused
+const ICON_GAP_IDLE = 4; // tighter gap when idle (your request)
 
-const BUMP_DIAMETER = 84;       // green dome size (smaller & tighter)
-const INNER_DIAMETER = 64;      // cream inner circle
+const BUMP_DIAMETER = 84; // green dome size (smaller & tighter)
+const INNER_DIAMETER = 64; // cream inner circle
 const INNER_BORDER = 2;
 
-const FOCUSED_ICON = 40;        // focused icon size (fits inner circle)
-const IDLE_ICON = 36;           // idle icon size
+const FOCUSED_ICON = 40; // focused icon size (fits inner circle)
+const IDLE_ICON = 36; // idle icon size
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -55,17 +55,25 @@ export default function TabLayout() {
           title: "feed",
           tabBarLabel: "feed",
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol name="newspaper.fill" color={focused ? THEME.green : color} size={focused ? FOCUSED_ICON : IDLE_ICON} />
+            <IconSymbol
+              name="newspaper.fill"
+              color={focused ? THEME.green : color}
+              size={focused ? FOCUSED_ICON : IDLE_ICON}
+            />
           ),
         }}
       />
       <Tabs.Screen
-        name="your-lists"
+        name="map"
         options={{
-          title: "your lists",
-          tabBarLabel: "your lists",
+          title: "map",
+          tabBarLabel: "map",
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol name="list.bullet" color={focused ? THEME.green : color} size={focused ? FOCUSED_ICON : IDLE_ICON} />
+            <IconSymbol
+              name="map.fill"
+              color={focused ? THEME.green : color}
+              size={focused ? FOCUSED_ICON : IDLE_ICON}
+            />
           ),
         }}
       />
@@ -75,7 +83,11 @@ export default function TabLayout() {
           title: "search",
           tabBarLabel: "search",
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol name="leaf.fill" color={focused ? THEME.green : color} size={focused ? FOCUSED_ICON : IDLE_ICON} />
+            <IconSymbol
+              name="leaf.fill"
+              color={focused ? THEME.green : color}
+              size={focused ? FOCUSED_ICON : IDLE_ICON}
+            />
           ),
         }}
       />
@@ -85,7 +97,11 @@ export default function TabLayout() {
           title: "leaderboard",
           tabBarLabel: "leaderboard",
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol name="trophy.fill" color={focused ? THEME.green : color} size={focused ? FOCUSED_ICON : IDLE_ICON} />
+            <IconSymbol
+              name="trophy.fill"
+              color={focused ? THEME.green : color}
+              size={focused ? FOCUSED_ICON : IDLE_ICON}
+            />
           ),
         }}
       />
@@ -95,7 +111,11 @@ export default function TabLayout() {
           title: "profile",
           tabBarLabel: "profile",
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol name="person.fill" color={focused ? THEME.green : color} size={focused ? FOCUSED_ICON : IDLE_ICON} />
+            <IconSymbol
+              name="person.fill"
+              color={focused ? THEME.green : color}
+              size={focused ? FOCUSED_ICON : IDLE_ICON}
+            />
           ),
         }}
       />
@@ -139,9 +159,9 @@ function CurvyTabBar({
             if (!isFocused && !event.defaultPrevented) {
               navigation.navigate(route.name);
             }
-            
+
             // Trigger refresh when profile tab is pressed
-            if (route.name === 'profile') {
+            if (route.name === "profile") {
               refreshProfile();
             }
           };
@@ -210,7 +230,11 @@ function CurvyTabBar({
                 </View>
               </View>
 
-              <View style={{ marginTop: isFocused ? ICON_GAP_FOCUSED : ICON_GAP_IDLE }}>
+              <View
+                style={{
+                  marginTop: isFocused ? ICON_GAP_FOCUSED : ICON_GAP_IDLE,
+                }}
+              >
                 <Text style={[styles.label, { color }]} numberOfLines={1}>
                   {text}
                 </Text>

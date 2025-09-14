@@ -439,9 +439,6 @@ export default function Profile() {
             <TouchableOpacity style={[styles.ghostButton]} onPress={refreshProfile}>
               <Text style={styles.ghostButtonText}>refresh</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.ghostButton]}>
-              <Text style={styles.ghostButtonText}>edit profile</Text>
-            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.ghostButton, styles.logoutGhostButton]}
               onPress={logout}

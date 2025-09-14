@@ -1,5 +1,12 @@
 // app/(tabs)/leaderboard.tsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -9,14 +16,13 @@ import {
   Text,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { firestoreService } from "../../services/firestore";
 
 // ---------- THEME ----------
 const THEME = {
-  bg: "#FFFAF0",             // warm cream
-  surface: "#FFF6EC",        // light cream
-  card: "#EEF4EE",           // soft desaturated green
+  bg: "#FFFAF0", // warm cream
+  surface: "#FFF6EC", // light cream
+  card: "#EEF4EE", // soft desaturated green
   cardAlt: "#E8EFE8",
   text: "#2F2A2A",
   subtext: "#5F5A5A",
@@ -35,6 +41,7 @@ interface LeaderboardUser {
   points: number;
   totalSpots: number;
   totalReviews: number;
+  totalRankings: number;
   averageRating: number;
 }
 
@@ -75,21 +82,26 @@ export default function Leaderboard() {
     try {
       setError(null);
       const allUsers = await firestoreService.query("users", []);
-      const normalized: LeaderboardUser[] = (allUsers ?? []).map((user: any) => {
-        const display = (user?.displayName ?? "").trim();
-        const safeName = display.length ? display : "Anonymous";
-        const spots = Number(user?.totalSpots ?? 0) || 0;
-        const reviews = Number(user?.totalReviews ?? 0) || 0;
-        const avg = Number(user?.averageRating ?? 0) || 0;
-        return {
-          id: String(user?.id ?? safeName),
-          name: safeName,
-          points: spots + reviews + Math.round(avg * 10),
-          totalSpots: spots,
-          totalReviews: reviews,
-          averageRating: avg,
-        };
-      });
+      const normalized: LeaderboardUser[] = (allUsers ?? []).map(
+        (user: any) => {
+          const display = (user?.displayName ?? "").trim();
+          const safeName = display.length ? display : "Anonymous";
+          const spots = Number(user?.totalSpots ?? 0) || 0;
+          const reviews = Number(user?.totalReviews ?? 0) || 0;
+          const avg = Number(user?.averageRating ?? 0) || 0;
+          const totalRankings = Number(user?.totalRankings ?? 0) || 0;
+          const points = totalRankings * 5;
+          return {
+            id: String(user?.id ?? safeName),
+            name: safeName,
+            points: points,
+            totalSpots: spots,
+            totalReviews: reviews,
+            totalRankings: totalRankings,
+            averageRating: avg,
+          };
+        }
+      );
       normalized.sort((a, b) => b.points - a.points);
       setUsers(normalized);
     } catch (err) {
@@ -154,8 +166,12 @@ export default function Leaderboard() {
         <Text style={styles.header}>leaderboard</Text>
         <View style={[styles.centerBox, { paddingTop: 40 }]}>
           <Ionicons name="podium-outline" size={40} color={THEME.primary} />
-          <Text style={[styles.errorTitle, { marginTop: 8 }]}>No entries yet</Text>
-          <Text style={styles.subtleText}>Be the first to add a spot or leave a review.</Text>
+          <Text style={[styles.errorTitle, { marginTop: 8 }]}>
+            No entries yet
+          </Text>
+          <Text style={styles.subtleText}>
+            Be the first to add a spot or leave a review.
+          </Text>
         </View>
       </View>
     );
@@ -202,7 +218,11 @@ export default function Leaderboard() {
         contentContainerStyle={{ paddingBottom: 20 }}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.primary} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={THEME.primary}
+          />
         }
         renderItem={({ item, index }) => (
           <RowCard
@@ -210,7 +230,7 @@ export default function Leaderboard() {
             name={item.name}
             points={item.points}
             spots={item.totalSpots}
-            reviews={item.totalReviews}
+            reviews={item.totalRankings}
             avg={item.averageRating}
           />
         )}
@@ -259,7 +279,11 @@ function PodiumBlock({
       <View style={[styles.badge, { backgroundColor: THEME.primary }]}>
         <Text style={styles.badgeInitial}>{initial}</Text>
       </View>
-      <Text style={styles.podiumName} numberOfLines={1} accessibilityLabel={`Rank ${rank} ${name}`}>
+      <Text
+        style={styles.podiumName}
+        numberOfLines={1}
+        accessibilityLabel={`Rank ${rank} ${name}`}
+      >
         {name}
       </Text>
       <Text style={styles.podiumPoints}>{points} pts</Text>
@@ -306,15 +330,7 @@ function RowCard({
         <Text style={styles.kpiText}>{points}</Text>
         <View style={styles.kpiChip}>
           <Ionicons name="map" size={12} color={THEME.primaryAlt} />
-          <Text style={styles.kpiChipText}>{spots}</Text>
-        </View>
-        <View style={styles.kpiChip}>
-          <Ionicons name="chatbubble" size={12} color={THEME.primaryAlt} />
           <Text style={styles.kpiChipText}>{reviews}</Text>
-        </View>
-        <View style={styles.kpiChip}>
-          <Ionicons name="star" size={12} color={THEME.primaryAlt} />
-          <Text style={styles.kpiChipText}>{avg.toFixed(1)}</Text>
         </View>
       </View>
     </View>

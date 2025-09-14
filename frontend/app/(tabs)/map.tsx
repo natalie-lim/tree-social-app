@@ -14,8 +14,8 @@ import { router, useNavigation } from "expo-router";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 
 import { collection, onSnapshot } from "firebase/firestore";
-import { Spot } from "../components/SpotCard";
-import { db } from "../config/firebase";
+import { Spot } from "../../components/SpotCard";
+import { db } from "../../config/firebase";
 
 type Place = {
   id: string;
@@ -120,22 +120,7 @@ export default function MapScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* Custom top bar */}
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={{ marginRight: 8 }}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={24}
-            paddingTop={40}
-            color={COLORS.text}
-          />
-        </TouchableOpacity>
-
-        <Text style={styles.brand}>leaflet</Text>
-      </View>
+  
 
       {/* Map / Loader */}
       {loading ? (
@@ -166,7 +151,7 @@ export default function MapScreen() {
             >
               <View style={{ alignItems: "center", justifyContent: "center" }}>
                 <Image
-                  source={require("../assets/images/mapleaf.png")}
+                  source={require("../../assets/images/mapleaf.png")}
                   style={{ width: 50, height: 50, tintColor: "#2F8C46" }} // bigger + green tint
                   resizeMode="contain"
                 />

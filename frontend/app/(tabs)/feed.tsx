@@ -15,6 +15,16 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { firestoreService } from "../../services/firestore";
 
+// Extended Spot type for feed with ranking user information
+interface SpotWithRanking extends Spot {
+  rankingUser?: {
+    userId: string;
+    userName: string;
+    userDisplayName: string;
+    userNotes?: string;
+  };
+}
+
 const COLORS = {
   bg: "#FFF6EC", // soft cream
   brand: "#2F4A43", // deep green (logo / active)
@@ -28,7 +38,7 @@ const COLORS = {
 
 export default function Feed() {
   const { user } = useAuth();
-  const [spots, setSpots] = useState<Spot[]>([]);
+  const [spots, setSpots] = useState<SpotWithRanking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +130,7 @@ export default function Feed() {
         }
       }
 
+      setSpots(spotsWithUsers as SpotWithRanking[]);
       // Rankings are already sorted by createdAt desc from the query
       // No additional sorting needed since we're processing them in order
       setSpots(spotsWithUsers as any[]);

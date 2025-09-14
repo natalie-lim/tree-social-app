@@ -1,9 +1,10 @@
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
-import { getRatingColor } from '@/utils/ratingColors';
+import { getRatingColor } from "@/utils/ratingColors";
 import React, { useEffect, useState } from "react";
 import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { db } from "../config/firebase";
 import { ThemedText } from "./themed-text";
+import { router } from "expo-router";
 
 // Types based on the document structure
 export interface SpotPhoto {
@@ -56,8 +57,7 @@ interface SpotCardProps {
   userNotes?: string;
 }
 
-const { width } = Dimensions.get('window');
-
+const { width } = Dimensions.get("window");
 
 export function SpotCard({
   spot,
@@ -76,7 +76,6 @@ export function SpotCard({
     let alive = true;
 
     async function loadDisplayName() {
-      // 1) Preferred: lookup by userId field in users collection
       if (rankingUserId) {
         try {
           const qRef = query(
@@ -84,7 +83,6 @@ export function SpotCard({
             where("userId", "==", rankingUserId),
             limit(1)
           );
-
           const qs = await getDocs(qRef);
           if (!alive) return;
           if (!qs.empty) {
@@ -94,11 +92,10 @@ export function SpotCard({
             );
             return;
           }
-        } catch (e) {
-          // swallow/log if you want
+        } catch {
+          // ignore
         }
       }
-      // 3) Last resort
       setResolvedName(userName || "User");
     }
 
@@ -108,14 +105,32 @@ export function SpotCard({
     };
   }, [rankingUserId, userDisplayName, userName]);
 
-  const accentColor = "#6FA076";
+  // Title case helper
+  const toTitleCase = (name: string) =>
+    name.replace(/\w\S*/g, (txt) => txt[0].toUpperCase() + txt.slice(1).toLowerCase());
 
-  // Convert to title case
-  const toTitleCase = (name: string) => {
-    return name.replace(
-      /\w\S*/g,
-      (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
-    );
+  // Navigation helpers
+  // SpotCard.tsx
+  const goToUser = () => {
+    if (!rankingUserId) return;
+    router.push(`/user/${encodeURIComponent(rankingUserId)}`);
+  };
+
+
+
+
+  const goToMap = () => {
+    const { latitude, longitude } = spot.location.coordinates || {};
+    if (latitude == null || longitude == null) return;
+    router.push({
+      pathname: "/map",
+      params: {
+        lat: String(latitude),
+        lng: String(longitude),
+        name: spot.name,
+        spotId: spot.id,
+      },
+    });
   };
 
   return (
@@ -125,21 +140,34 @@ export function SpotCard({
         <View style={styles.mainRow}>
           {/* Left side - Spot info */}
           <View style={styles.spotInfo}>
-            <ThemedText style={styles.spotName} numberOfLines={1}>
-              <ThemedText style={styles.boldText}>
-                {toTitleCase(resolvedName || "User")}
-              </ThemedText>{" "}
-              <ThemedText style={styles.normalText}>explored</ThemedText>{" "}
-              <ThemedText style={styles.boldText}>{spot.name}</ThemedText>
-            </ThemedText>
-            <ThemedText style={styles.spotLocation} numberOfLines={1}>
-              {spot.location.address}
-            </ThemedText>
+            {/* High-contrast header line with links */}
+            <View style={styles.spotNameRow}>
+              <Pressable onPress={goToUser} accessibilityRole="link" hitSlop={6}>
+                <Text style={[styles.spotName, styles.spotNameLink]}>
+                  {toTitleCase(resolvedName || "User")}
+                </Text>
+              </Pressable>
+              <Text style={[styles.spotName, styles.spotNameRegular]}> explored </Text>
+              <Text style={[styles.spotName, styles.spotNameStrong]}>{spot.name}</Text>
+            </View>
+
+
+            {/* Address → Map */}
+            <Pressable onPress={goToMap} accessibilityRole="link" hitSlop={6}>
+              <ThemedText style={styles.spotLocation} numberOfLines={1}>
+                {spot.location.address}
+              </ThemedText>
+            </Pressable>
           </View>
 
           {/* Right side - Rating circle */}
           {spot.averageRating > 0 && (
-            <View style={styles.ratingCircle}>
+            <View
+              style={[
+                styles.ratingCircle,
+                { backgroundColor: getRatingColor(spot.averageRating) },
+              ]}
+            >
               <Text style={styles.ratingText}>
                 {spot.averageRating.toFixed(1)}
               </Text>
@@ -156,7 +184,7 @@ export function SpotCard({
         </View>
 
         {/* Comments and Likes Section */}
-        <View style={styles.socialSection}>
+        <View className="social" style={styles.socialSection}>
           <View style={styles.socialItem}>
             <Text style={styles.socialIcon}>💬</Text>
             <ThemedText style={styles.socialText}>
@@ -202,27 +230,34 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
+
+  // Title line ("Evie explored Half Dome Trail")
   spotName: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#111827",
+    color: "#1A1A1A", // darker base color
     marginBottom: 4,
   },
-  spotLocation: {
-    fontSize: 14,
-    color: "#6B7280",
-  },
-  boldText: {
+  // Ensure inner fragments keep the same dark color
+  spotNameStrong: { color: "#1A1A1A", fontWeight: "700" },
+  spotNameRegular: { color: "#1A1A1A", fontWeight: "400" },
+
+  // Username styled as a link
+  spotNameLink: {
+    color: "#2F4A43", // brand green
     fontWeight: "700",
   },
-  normalText: {
-    fontWeight: "400",
+
+  // Address → Map
+  spotLocation: {
+    fontSize: 14,
+    color: "#2F4A43", // darker so it reads as tappable
   },
+
   ratingCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#6FA076",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -230,26 +265,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "700",
-  },
-
-  // User section
-  userSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: "#F0F9FF",
-    borderRadius: 6,
-  },
-  userIcon: {
-    fontSize: 12,
-    marginRight: 6,
-  },
-  userText: {
-    fontSize: 12,
-    color: "#0369A1",
-    fontWeight: "600",
   },
 
   // Notes section
@@ -293,4 +308,10 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     fontWeight: "500",
   },
+  spotNameRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "baseline", // makes text align better on first line
+  },
+
 });

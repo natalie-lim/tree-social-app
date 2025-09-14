@@ -21,7 +21,7 @@ const COLORS = {
   chip: "#1F5B4E", // dark teal for buttons
   chipText: "#FFFFFF",
   text: "#222326",
-  sub: "#6F7276",
+  sub: "#3E3E3E",
   inputBg: "#F2F4F5",
   border: "#E3E6E8",
 };
@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
   },
   cardSub: {
     marginTop: 6,
-    color: COLORS.sub,
+    color: COLORS.text,
   },
   spotCard: {
     marginBottom: 16,

@@ -19,6 +19,7 @@ const COLORS = {
   brand: "#2F4A43", // deep green (logo / active)
   chip: "#1F5B4E", // dark teal for buttons
   chipText: "#FFFFFF",
+  green: "#749C75",
   text: "#222326",
   sub: "#6F7276",
   inputBg: "#F2F4F5",
@@ -243,6 +244,24 @@ export default function MemberDetailScreen() {
               {isFollowing ? "Following" : "Follow"}
             </Text>
           </Pressable>
+
+          {/* Follow Stats */}
+          <View style={styles.followStatsSection}>
+            <View style={styles.followStatsRow}>
+              <View style={styles.statItem}>
+                <Text style={styles.followStatNumber}>
+                  {member.followerCount || 0}
+                </Text>
+                <Text style={styles.statLabel}>Followers</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.followStatNumber}>
+                  {member.followingCount || 0}
+                </Text>
+                <Text style={styles.statLabel}>Following</Text>
+              </View>
+            </View>
+          </View>
         </View>
 
         {/* Stats Section */}
@@ -250,15 +269,11 @@ export default function MemberDetailScreen() {
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{member.totalRankings}</Text>
-              <Text style={styles.statLabel}>Spots</Text>
+              <Text style={styles.statLabel}>Spots Explored</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{member.totalRankings * 5}</Text>
               <Text style={styles.statLabel}>Points</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{member.followerCount || 0}</Text>
-              <Text style={styles.statLabel}>Followers</Text>
             </View>
           </View>
         </View>
@@ -377,7 +392,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   followButton: {
-    backgroundColor: COLORS.brand,
+    backgroundColor: COLORS.green,
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 25,
@@ -396,6 +411,22 @@ const styles = StyleSheet.create({
   },
   followingButtonText: {
     color: COLORS.text,
+  },
+  followStatsSection: {
+    marginTop: 24,
+    paddingHorizontal: 20,
+  },
+  followStatsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    paddingHorizontal: 20,
+  },
+  followStatNumber: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.brand,
+    marginBottom: 4,
   },
   statsSection: {
     backgroundColor: COLORS.white,

@@ -199,7 +199,7 @@ export default function MemberDetailScreen() {
     checkFollowingStatus();
   }, [user, member]);
 
-  // Fetch member's rankings
+  // Fetch member's rankings (only once when member is first loaded)
   useEffect(() => {
     const fetchMemberRankings = async () => {
       if (!member) return;
@@ -278,7 +278,7 @@ export default function MemberDetailScreen() {
     };
 
     fetchMemberRankings();
-  }, [member]);
+  }, [member?.userId]); // Only depend on userId, not the entire member object
 
   const handleFollowPress = async () => {
     if (!user || !member) return;

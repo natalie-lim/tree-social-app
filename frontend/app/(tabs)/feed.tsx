@@ -175,16 +175,6 @@ export default function Feed() {
       {/* Top bar */}
       <View style={styles.topRow}>
         <Text style={styles.brand}>leaflet</Text>
-
-        <View style={styles.icons}>
-          <Ionicons name="calendar-outline" size={22} color={COLORS.text} />
-          <Ionicons
-            name="notifications-outline"
-            size={22}
-            color={COLORS.text}
-            style={{ marginLeft: 14 }}
-          />
-        </View>
       </View>
 
       {/* Search bar */}

@@ -1,5 +1,5 @@
-// app/(tabs)/map.tsx
-import * as Location from "expo-location"; // ✅ ask for permission + get coords
+
+import * as Location from "expo-location";
 import { router, useNavigation } from "expo-router";
 import { collection, onSnapshot } from "firebase/firestore";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -139,7 +139,6 @@ export default function MapScreen() {
     return unsub;
   }, [userRegion]);
 
-  // ✅ initial region preference: user → first spot → default (Philadelphia)
   const initialRegion = useMemo<Region>(() => {
     if (userRegion) return userRegion;
     const first = spots[0];
@@ -169,7 +168,7 @@ export default function MapScreen() {
         <MapView
           ref={(r) => (mapRef.current = r)}
           style={{ flex: 1 }}
-          provider={PROVIDER_GOOGLE} // custom style requires Google provider on iOS
+          provider={PROVIDER_GOOGLE} 
           customMapStyle={COLORFUL_MAP_STYLE}
           initialRegion={initialRegion}
           showsUserLocation // blue dot

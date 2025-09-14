@@ -24,6 +24,7 @@ export type Spot = {
 
 export type UserLite = {
   id: string;
+  userId?: string; // Auth UID stored in the document
   handle?: string;
   username_lower?: string;
   displayName?: string;
@@ -99,7 +100,8 @@ export function buildLocationSubtitle(s: SpotCardType): string | undefined {
  */
 export async function searchFirestore(
   tab: TabKey,
-  queryInput: string
+  queryInput: string,
+  currentUserId?: string
 ): Promise<ResultItem[]> {
   if (!queryInput) return [];
 
@@ -141,12 +143,21 @@ export async function searchFirestore(
     const snap = await getDocs(queryRef);
 
     // Filter users where displayName starts with the normalized query (case-insensitive)
+    // and exclude the current user if provided
     const filteredUsers = snap.docs
       .filter((d) => {
         const u = d.data() as UserLite;
         const displayName = u?.displayName || "";
         const normalizedDisplayName = normalize(displayName);
-        return normalizedDisplayName.startsWith(normalizedQuery);
+        const matchesQuery = normalizedDisplayName.startsWith(normalizedQuery);
+        const isNotCurrentUser = !currentUserId || u?.userId !== currentUserId;
+
+        // Debug logging
+        console.log(
+          `User ${d.id}: displayName="${displayName}", userId="${u?.userId}", matchesQuery=${matchesQuery}, isNotCurrentUser=${isNotCurrentUser}, currentUserId="${currentUserId}"`
+        );
+
+        return matchesQuery && isNotCurrentUser;
       })
       .slice(0, 20); // Limit to 20 results
 

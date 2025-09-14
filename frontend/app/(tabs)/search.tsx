@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useAuth } from "../../contexts/AuthContext";
 
 // Import search service
 import {
@@ -35,6 +36,7 @@ const COLORS = {
 const BG = "#FFF6EC";
 
 export default function SearchScreen() {
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<TabKey>("locations");
 
@@ -80,7 +82,8 @@ export default function SearchScreen() {
       setLoading(true);
       setError(null);
       try {
-        const out = await searchFirestore(tab, debounced);
+        console.log("Searching with currentUserId:", user?.uid);
+        const out = await searchFirestore(tab, debounced, user?.uid);
         if (cancelled) return;
         setResults(out);
         cacheRef.current[cacheKey] = out;

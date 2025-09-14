@@ -106,6 +106,8 @@ export default function SpotDetailPage() {
   const [showRankingPopup, setShowRankingPopup] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [comparisonSpots, setComparisonSpots] = useState<Spot[]>([]);
+  const [averageRanking, setAverageRanking] = useState<number>(0);
+  const [rankingCount, setRankingCount] = useState<number>(0);
 
   let spot: Spot | null = null;
   try {
@@ -141,6 +143,39 @@ export default function SpotDetailPage() {
         return '🎭';
       default:
         return '📍';
+    }
+  };
+
+  const calculateAverageRanking = async (spotId: string) => {
+    try {
+      // Get all rankings for this spot
+      const rankings = await firestoreService.query('rankings', [
+        { field: 'spotId', operator: '==', value: spotId }
+      ]);
+
+      if (rankings.length > 0) {
+        const totalRating = rankings.reduce((sum, ranking) => sum + ((ranking as any).rating || 0), 0);
+        const average = totalRating / rankings.length;
+        const roundedAverage = Math.round(average * 10) / 10; // Round to 1 decimal place
+        
+        setAverageRanking(roundedAverage);
+        setRankingCount(rankings.length);
+
+        // Update the spot in the database with the new average ranking
+        await firestoreService.update('spots', spotId, {
+          averageRanking: roundedAverage,
+          rankingCount: rankings.length,
+          updatedAt: new Date()
+        });
+
+        console.log(`Updated spot ${spotId} with average ranking: ${roundedAverage} (${rankings.length} rankings)`);
+      } else {
+        console.log(`No rankings found for spot ${spotId}`);
+        setAverageRanking(0);
+        setRankingCount(0);
+      }
+    } catch (error) {
+      console.error('Error calculating average ranking:', error);
     }
   };
 
@@ -182,7 +217,7 @@ export default function SpotDetailPage() {
 
   const heroUrl = spot.photos?.[0]?.url;
 
-  // Check if user has ranked this spot
+  // Check if user has ranked this spot and calculate average ranking
   useEffect(() => {
     const checkRankingStatus = async () => {
       try {
@@ -191,6 +226,9 @@ export default function SpotDetailPage() {
           setIsLoading(false);
           return;
         }
+
+        // Calculate average ranking for this spot
+        await calculateAverageRanking(spot.id);
 
         // Check if user has a ranking for this spot
         const ranking = await rankingsService.getUserRankingForSpot(currentUser.uid, spot.id);
@@ -281,6 +319,9 @@ export default function SpotDetailPage() {
       } catch (updateError: any) {
         console.warn('Could not update user average ranking:', updateError.message);
       }
+
+      // Recalculate average ranking for this spot
+      await calculateAverageRanking(spot.id);
 
       // Update local state
       console.log('Setting user rating to:', rating);
@@ -420,14 +461,28 @@ export default function SpotDetailPage() {
                 {spot.name}
               </ThemedText>
 
-              {/* Ranking icon in the corner */}
-              <Pressable onPress={handleRankingPress} hitSlop={10}>
-                <View style={[styles.rankIcon, isRanked ? styles.rankIconChecked : styles.rankIconAdd]}>
-                  <ThemedText style={styles.rankIconText}>
-                    {isRanked ? `${userRating}★` : '+'}
-                  </ThemedText>
-                </View>
-              </Pressable>
+              <View style={styles.rankingSection}>
+                {/* Average Ranking */}
+                {rankingCount > 0 && (
+                  <View style={styles.averageRankingContainer}>
+                    <ThemedText style={styles.averageRankingText}>
+                      {averageRanking}
+                    </ThemedText>
+                    <ThemedText style={styles.averageRankingLabel}>
+                      avg
+                    </ThemedText>
+                  </View>
+                )}
+
+                {/* User Ranking Button */}
+                <Pressable onPress={handleRankingPress} hitSlop={10}>
+                  <View style={[styles.rankIcon, isRanked ? styles.rankIconChecked : styles.rankIconAdd]}>
+                    <ThemedText style={styles.rankIconText}>
+                      {isRanked ? `${userRating}` : '+'}
+                    </ThemedText>
+                  </View>
+                </Pressable>
+              </View>
             </View>
 
             <View style={styles.categoryRow}>
@@ -639,7 +694,8 @@ const styles = StyleSheet.create({
   titleRow: { 
     flexDirection: 'row', 
     alignItems: 'flex-start', 
-    marginBottom: theme.spacing(3) 
+    marginBottom: theme.spacing(4),
+    minHeight: 80,
   },
   title: { 
     fontSize: 28, 
@@ -647,6 +703,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF', 
     flex: 1, 
     marginRight: theme.spacing(3),
+    lineHeight: 36,
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
@@ -683,6 +740,30 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 24,
     fontWeight: '800',
+  },
+  rankingSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing(2),
+  },
+  averageRankingContainer: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 8,
+    paddingHorizontal: theme.spacing(2),
+    paddingVertical: theme.spacing(1),
+    ...theme.shadows.sm,
+  },
+  averageRankingText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: theme.colors.primary,
+  },
+  averageRankingLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: theme.colors.muted,
+    textTransform: 'uppercase',
   },
   categoryRow: { 
     flexDirection: 'row', 

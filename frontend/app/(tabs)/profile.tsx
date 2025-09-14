@@ -24,6 +24,18 @@ type ListRowProps = {
   onPress?: () => void;
 };
 
+
+const COLORS = {
+  bg: "#FFF6EC", // soft cream
+  brand: "#2F4A43", // deep green (logo / active)
+  chip: "#1F5B4E", // dark teal for buttons
+  chipText: "#FFFFFF",
+  text: "#222326",
+  sub: "#3E3E3E",
+  inputBg: "#F2F4F5",
+  border: "#E3E6E8",
+};
+
 interface UserProfile {
   id: string;
   displayName: string;
@@ -376,9 +388,7 @@ export default function Profile() {
 
   if (authLoading || profileLoading) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <CuteLoading message="Loading your profile..." size="medium" showMessage />
-      </SafeAreaView>
+        <CuteLoading message="Loading your profile..." size="large" showMessage />
     );
   }
 
@@ -418,8 +428,7 @@ export default function Profile() {
         <ScrollView contentContainerStyle={styles.scroll}>
           {/* Header brand */}
           <View style={styles.brandRow}>
-            <Text style={styles.brandLogo}>🌿</Text>
-            <Text style={styles.brandName}>Leaflet</Text>
+            <Text style={styles.brand}>leaflet</Text>
           </View>
 
           {/* Avatar (Letter-based) */}
@@ -530,6 +539,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 8,
+  },
+  brand: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: COLORS.brand,
+    letterSpacing: 0.5,
   },
   brandLogo: { fontSize: 25, marginRight: 8 },
   brandName: {

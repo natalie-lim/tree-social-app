@@ -4,12 +4,12 @@ import { firestoreService } from '@/services/firestore';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    View
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 

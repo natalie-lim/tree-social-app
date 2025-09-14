@@ -27,6 +27,11 @@ import { userService } from '../services/natureApp';
 
 
 export default function UserRankingsPage() {
+  const navigation = useNavigation();
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: false } as any);
+  }, [navigation]);
+
   const { userId, userName } = useLocalSearchParams();
   const [userRankings, setUserRankings] = useState<UserRanking[]>([]);
   const [filteredRankings, setFilteredRankings] = useState<UserRanking[]>([]);
@@ -36,107 +41,97 @@ export default function UserRankingsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-  const fetchUserRankings = async () => {
-    if (!userId) {
-      setError('No user ID provided');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const profile = await userService.getUserProfile(userId as string);
-      
-      if (!profile || !(profile as any).rankings) {
-        setUserRankings([]);
+    const fetchUserRankings = async () => {
+      if (!userId) {
+        setError('No user ID provided');
+        setLoading(false);
         return;
       }
 
-      // Get all ranking IDs from user profile
-      const rankingIds = (profile as any).rankings.map((ranking: any) => ranking.rankingId);
-      const fullRankings: UserRanking[] = [];
+      try {
+        setLoading(true);
+        const profile = await userService.getUserProfile(userId as string);
 
-      // Fetch each ranking document individually
-      for (const rankingId of rankingIds) {
-        try {
-          const rankingDoc = await firestoreService.read('rankings', rankingId);
-          if (rankingDoc) {
-            const spotId = (rankingDoc as any).spotId || '';
-            
-            // Fetch full spot data
-            let spotData = null;
-            if (spotId) {
-              try {
-                spotData = await firestoreService.read('spots', spotId);
-              } catch (spotErr) {
-                console.warn(`Could not fetch spot ${spotId}:`, spotErr);
+        if (!profile || !(profile as any).rankings) {
+          setUserRankings([]);
+          return;
+        }
+
+        const rankingIds = (profile as any).rankings.map((r: any) => r.rankingId);
+        const fullRankings: UserRanking[] = [];
+
+        for (const rankingId of rankingIds) {
+          try {
+            const rankingDoc = await firestoreService.read('rankings', rankingId);
+            if (rankingDoc) {
+              const spotId = (rankingDoc as any).spotId || '';
+              let spotData = null;
+              if (spotId) {
+                try {
+                  spotData = await firestoreService.read('spots', spotId);
+                } catch (spotErr) {
+                  console.warn(`Could not fetch spot ${spotId}:`, spotErr);
+                }
               }
-            }
 
-            // Create ranking with full spot data
-            const ranking: UserRanking = {
-              rankingId: rankingDoc.id || rankingId,
-              spotId: spotId,
-              spotName: spotData ? (spotData as any).name : (rankingDoc as any).spotName || '',
-              spotLocation: spotData ? (spotData as any).location?.address : (rankingDoc as any).spotLocation || '',
-              rating: (rankingDoc as any).rating || 0,
-              note: (rankingDoc as any).note || '',
-              createdAt: (rankingDoc as any).createdAt,
-              updatedAt: (rankingDoc as any).updatedAt,
-              // Add full spot data for navigation
-              spotData: spotData ? {
-                id: spotData.id || spotId,
-                name: (spotData as any).name || (rankingDoc as any).spotName || '',
-                description: (spotData as any).description || 'No description available',
-                category: (spotData as any).category || 'No category',
-                location: (spotData as any).location || { 
-                  address: (rankingDoc as any).spotLocation || 'Unknown Location',
-                  coordinates: (spotData as any).location?.coordinates || {
-                    latitude: 0,
-                    longitude: 0
-                  }
-                },
-                photos: (spotData as any).photos || [],
-                amenities: (spotData as any).amenities || [],
-                averageRating: (spotData as any).averageRating || 0,
-                reviewCount: (spotData as any).reviewCount || 0,
-                totalRatings: (spotData as any).totalRatings || 0,
-                bestTimeToVisit: (spotData as any).bestTimeToVisit || [],
-                difficulty: (spotData as any).difficulty || 'varies',
-                distance: (spotData as any).distance || '',
-                duration: (spotData as any).duration || '',
-                elevation: (spotData as any).elevation || '',
-                isVerified: (spotData as any).isVerified || false,
-                npsCode: (spotData as any).npsCode || '',
-                website: (spotData as any).website || '',
-                tags: (spotData as any).tags || [],
-                createdAt: (spotData as any).createdAt || new Date(),
-                createdBy: (spotData as any).createdBy || '',
-                source: (spotData as any).source || 'USER_ADDED',
-                updatedAt: (spotData as any).updatedAt || new Date()
-              } : null
-            };
-            fullRankings.push(ranking);
-          }
-        } catch (err) {
-          console.warn(`Could not fetch ranking ${rankingId}:`, err);
-          // If ranking document doesn't exist, create a fallback from user profile data
-          const profileRanking = (profile as any).rankings.find((r: any) => r.rankingId === rankingId);
-          if (profileRanking) {
-            fullRankings.push({
-              rankingId: profileRanking.rankingId,
-              spotId: profileRanking.spotId,
-              spotName: profileRanking.spotName,
-              spotLocation: 'Location not available',
-              rating: profileRanking.rating,
-              note: 'No notes available',
-              createdAt: profileRanking.createdAt,
-              updatedAt: profileRanking.createdAt,
-              spotData: null
-            });
+              const ranking: UserRanking = {
+                rankingId: rankingDoc.id || rankingId,
+                spotId,
+                spotName: spotData ? (spotData as any).name : (rankingDoc as any).spotName || '',
+                spotLocation: spotData ? (spotData as any).location?.address : (rankingDoc as any).spotLocation || '',
+                rating: (rankingDoc as any).rating || 0,
+                note: (rankingDoc as any).note || '',
+                createdAt: (rankingDoc as any).createdAt,
+                updatedAt: (rankingDoc as any).updatedAt,
+                spotData: spotData ? {
+                  id: spotData.id || spotId,
+                  name: (spotData as any).name || (rankingDoc as any).spotName || '',
+                  description: (spotData as any).description || 'No description available',
+                  category: (spotData as any).category || 'No category',
+                  location: (spotData as any).location || {
+                    address: (rankingDoc as any).spotLocation || 'Unknown Location',
+                    coordinates: (spotData as any).location?.coordinates || { latitude: 0, longitude: 0 }
+                  },
+                  photos: (spotData as any).photos || [],
+                  amenities: (spotData as any).amenities || [],
+                  averageRating: (spotData as any).averageRating || 0,
+                  reviewCount: (spotData as any).reviewCount || 0,
+                  totalRatings: (spotData as any).totalRatings || 0,
+                  bestTimeToVisit: (spotData as any).bestTimeToVisit || [],
+                  difficulty: (spotData as any).difficulty || 'varies',
+                  distance: (spotData as any).distance || '',
+                  duration: (spotData as any).duration || '',
+                  elevation: (spotData as any).elevation || '',
+                  isVerified: (spotData as any).isVerified || false,
+                  npsCode: (spotData as any).npsCode || '',
+                  website: (spotData as any).website || '',
+                  tags: (spotData as any).tags || [],
+                  createdAt: (spotData as any).createdAt || new Date(),
+                  createdBy: (spotData as any).createdBy || '',
+                  source: (spotData as any).source || 'USER_ADDED',
+                  updatedAt: (spotData as any).updatedAt || new Date()
+                } : null
+              };
+              fullRankings.push(ranking);
+            }
+          } catch (err) {
+            console.warn(`Could not fetch ranking ${rankingId}:`, err);
+            const profileRanking = (profile as any).rankings.find((r: any) => r.rankingId === rankingId);
+            if (profileRanking) {
+              fullRankings.push({
+                rankingId: profileRanking.rankingId,
+                spotId: profileRanking.spotId,
+                spotName: profileRanking.spotName,
+                spotLocation: 'Location not available',
+                rating: profileRanking.rating,
+                note: 'No notes available',
+                createdAt: profileRanking.createdAt,
+                updatedAt: profileRanking.createdAt,
+                spotData: null
+              });
+            }
           }
         }
-      }
 
       // Sort by rating (highest to lowest)
       const sortedRankings = fullRankings.sort((a, b) => {
@@ -243,7 +238,7 @@ export default function UserRankingsPage() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.root}>
-        {/* Header */}
+        {/* Header (centered, matches Bookmarks) */}
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
@@ -305,35 +300,28 @@ export default function UserRankingsPage() {
                 key={ranking.rankingId}
                 ranking={ranking}
                 rankNumber={index + 1}
-                onPress={(ranking) => {
-                  // Navigate to spot detail with full spot data
-                  if (ranking.spotData) {
+                onPress={(r) => {
+                  if (r.spotData) {
                     router.push({
                       pathname: '/spot-detail',
-                      params: {
-                        spotData: JSON.stringify(ranking.spotData)
-                      }
+                      params: { spotData: JSON.stringify(r.spotData) }
                     });
                   } else {
-                    // Fallback to basic data if spot data not available
                     router.push({
                       pathname: '/spot-detail',
                       params: {
                         spotData: JSON.stringify({
-                          id: ranking.spotId,
-                          name: ranking.spotName,
-                          description: ranking.note || 'No description available',
+                          id: r.spotId,
+                          name: r.spotName,
+                          description: r.note || 'No description available',
                           category: 'No category',
-                          location: { 
-                            address: ranking.spotLocation,
-                            coordinates: {
-                              latitude: 0,
-                              longitude: 0
-                            }
+                          location: {
+                            address: r.spotLocation,
+                            coordinates: { latitude: 0, longitude: 0 }
                           },
                           photos: [],
                           amenities: [],
-                          averageRating: ranking.rating,
+                          averageRating: r.rating,
                           reviewCount: 1,
                           totalRatings: 1,
                           bestTimeToVisit: [],
@@ -345,10 +333,10 @@ export default function UserRankingsPage() {
                           npsCode: '',
                           website: '',
                           tags: [],
-                          createdAt: ranking.createdAt || new Date(),
+                          createdAt: r.createdAt || new Date(),
                           createdBy: userId,
                           source: 'USER_ADDED',
-                          updatedAt: ranking.updatedAt || new Date()
+                          updatedAt: r.updatedAt || new Date()
                         })
                       }
                     });
@@ -375,6 +363,8 @@ export default function UserRankingsPage() {
     </SafeAreaView>
   );
 }
+
+const SIDE_TAP_AREA = 40;
 
 const styles = StyleSheet.create({
   safe: { 
@@ -540,11 +530,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: PALETTE.bg,
   },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: PALETTE.subtext,
-  },
+  loadingText: { marginTop: 16, fontSize: 16, color: PALETTE.subtext },
 
   // Error
   errorContainer: {

@@ -38,6 +38,7 @@ export default function RootLayout() {
             <Stack.Screen name="spot-detail" options={{ headerShown: false }} />
             <Stack.Screen name="add-place" options={{ headerShown: false }} />
             <Stack.Screen name="ranking" options={{ headerShown: false }} />
+            <Stack.Screen name="user-rankings" options={{ headerShown: false }} />
             <Stack.Screen name="+not-found" />
           </Stack>
           <StatusBar style="auto" />

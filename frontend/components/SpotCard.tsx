@@ -1,3 +1,4 @@
+import { getRatingColor } from '@/utils/ratingColors';
 import React from 'react';
 import {
     Dimensions,
@@ -57,8 +58,9 @@ interface SpotCardProps {
 
 const { width } = Dimensions.get('window');
 
+
 export function SpotCard({ spot, onPress, style }: SpotCardProps) {
-  const accentColor = '#6FA076'; // Your app's accent color
+  const ratingColor = getRatingColor(spot.averageRating);
 
   return (
     <Pressable 
@@ -80,7 +82,7 @@ export function SpotCard({ spot, onPress, style }: SpotCardProps) {
           
           {/* Right side - Rating circle */}
           {spot.averageRating > 0 && (
-            <View style={styles.ratingCircle}>
+            <View style={[styles.ratingCircle, { backgroundColor: ratingColor }]}>
               <Text style={styles.ratingText}>{spot.averageRating.toFixed(1)}</Text>
             </View>
           )}
@@ -148,16 +150,20 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   ratingCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#6FA076',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   ratingText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
   },
 

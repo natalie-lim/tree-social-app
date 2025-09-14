@@ -1,7 +1,8 @@
+import RankingPopup from '@/components/RankingPopup';
 import { Spot } from '@/components/SpotCard';
 import { ThemedText } from '@/components/themed-text';
 import { auth } from '@/config/firebase';
-import { rankingsService } from '@/services/firestore';
+import { firestoreService, rankingsService } from '@/services/firestore';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -101,6 +102,9 @@ export default function SpotDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRanked, setIsRanked] = useState(false);
   const [userRating, setUserRating] = useState<number | null>(null);
+  const [showRankingPopup, setShowRankingPopup] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [comparisonSpots, setComparisonSpots] = useState<Spot[]>([]);
 
   let spot: Spot | null = null;
   try {
@@ -126,7 +130,7 @@ export default function SpotDetailPage() {
 
   const getCategoryIcon = (category?: string) => {
     switch (category) {
-      case 'parks_nature':
+      case 'z_nature':
         return '🌲';
       case 'historical':
         return '🏛️';
@@ -214,28 +218,190 @@ export default function SpotDetailPage() {
       // Already ranked - could show rating details or allow editing
       console.log('Spot already ranked with rating:', userRating);
     } else {
-      // Navigate to ranking page
-      console.log('=== SPOT DETAIL DEBUG ===');
-      console.log('Spot object:', spot);
-      console.log('Spot ID:', spot?.id);
-      console.log('Spot name:', spot?.name);
-      console.log('Spot location:', spot?.location);
-      console.log('Serialized spot data:', JSON.stringify(spot));
-      
-      try {
-        router.push({
-          pathname: '/ranking',
-          params: {
-            spotData: JSON.stringify(spot)
-          }
-        });
-      } catch (error) {
-        console.error('Navigation error:', error);
-        // Fallback navigation
-        router.push('/ranking');
-      }
+      // Show ranking popup
+      setShowRankingPopup(true);
     }
   };
+
+  const handleSubmitRanking = async (rating: number, note: string, rankedList: Spot[]) => {
+    if (!spot) return;
+
+    setIsSubmitting(true);
+    try {
+      const currentUser = auth.currentUser;
+      
+      if (!currentUser) {
+        throw new Error('You must be logged in to rate spots');
+      }
+
+      // Create ranking data
+      const rankingData = {
+        userId: currentUser.uid,
+        spotId: spot.id,
+        spotName: spot.name,
+        spotLocation: spot.location?.address || 'Unknown Location',
+        rating: rating,
+        note: note.trim() || null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      // Save ranking to Firebase
+      const rankingId = await rankingsService.createRanking(rankingData);
+
+      // Update user's rankings list with the new ranking
+      const userRankings = await firestoreService.query('users', [
+        { field: 'userId', operator: '==', value: currentUser.uid }
+      ]);
+      
+      if (userRankings.length > 0) {
+        const userDoc = userRankings[0];
+        const currentRankings = (userDoc as any).rankings || [];
+        const updatedRankings = [...currentRankings, {
+          rankingId: rankingId,
+          spotId: spot.id,
+          spotName: spot.name,
+          rating: rating,
+          createdAt: new Date()
+        }];
+        
+        await firestoreService.update('users', userDoc.id, {
+          rankings: updatedRankings,
+          totalRankings: updatedRankings.length,
+          updatedAt: new Date()
+        });
+      }
+
+      // Update spot's average rating
+      try {
+        const currentRating = spot.averageRating || 0;
+        const currentCount = spot.reviewCount || 0;
+        const newAverage = ((currentRating * currentCount) + rating) / (currentCount + 1);
+        
+        await firestoreService.update('spots', spot.id, {
+          averageRating: Math.round(newAverage * 10) / 10,
+          reviewCount: currentCount + 1,
+          totalRatings: (spot.totalRatings || 0) + 1,
+          updatedAt: new Date()
+        });
+      } catch (updateError: any) {
+        console.warn('Could not update spot in Firestore:', updateError.message);
+      }
+
+      // Update local state
+      setIsRanked(true);
+      setUserRating(rating);
+      setShowRankingPopup(false);
+
+      // Note: The rankedList parameter contains the user's personal ranking order
+      // This could be used for future features like showing user's personal rankings
+
+    } catch (error: any) {
+      console.error('Error saving rating:', error);
+      throw error; // Re-throw to let the popup handle the error display
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleClosePopup = () => {
+    setShowRankingPopup(false);
+  };
+
+  // Fetch user's previously ranked spots for comparison
+  useEffect(() => {
+    const fetchUserRankedSpots = async () => {
+      if (!spot) return;
+      
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          setComparisonSpots([]);
+          return;
+        }
+
+        // Get user's profile to find their rankings
+        const userRankings = await firestoreService.query('users', [
+          { field: 'userId', operator: '==', value: currentUser.uid }
+        ]);
+        
+        if (userRankings.length === 0) {
+          setComparisonSpots([]);
+          return;
+        }
+
+        const userDoc = userRankings[0];
+        const userRankingsList = (userDoc as any).rankings || [];
+        
+        if (userRankingsList.length === 0) {
+          setComparisonSpots([]);
+          return;
+        }
+
+        // Get spots that user has ranked, excluding current spot
+        const rankedSpotIds = userRankingsList
+          .map((ranking: any) => ranking.spotId)
+          .filter((spotId: string) => spotId !== spot.id);
+
+        if (rankedSpotIds.length === 0) {
+          setComparisonSpots([]);
+          return;
+        }
+
+        // Fetch the actual spot data for user's ranked spots
+        const rankedSpots: Spot[] = [];
+        for (const spotId of rankedSpotIds) {
+          try {
+            const spotDoc = await firestoreService.read('spots', spotId);
+            if (spotDoc) {
+              const spotData = {
+                id: spotDoc.id || spotId,
+                name: (spotDoc as any).name || 'Unknown Spot',
+                description: (spotDoc as any).description || 'No description available',
+                category: (spotDoc as any).category || 'No category',
+                location: (spotDoc as any).location || { address: 'Unknown Location' },
+                photos: (spotDoc as any).photos || [],
+                amenities: (spotDoc as any).amenities || [],
+                averageRating: (spotDoc as any).averageRating || 0,
+                reviewCount: (spotDoc as any).reviewCount || 0,
+                totalRatings: (spotDoc as any).totalRatings || 0,
+                bestTimeToVisit: (spotDoc as any).bestTimeToVisit || [],
+                difficulty: (spotDoc as any).difficulty || 'varies',
+                distance: (spotDoc as any).distance || '',
+                duration: (spotDoc as any).duration || '',
+                elevation: (spotDoc as any).elevation || '',
+                isVerified: (spotDoc as any).isVerified || false,
+                npsCode: (spotDoc as any).npsCode || '',
+                website: (spotDoc as any).website || '',
+                tags: (spotDoc as any).tags || [],
+                createdAt: (spotDoc as any).createdAt || new Date(),
+                createdBy: (spotDoc as any).createdBy || '',
+                source: (spotDoc as any).source || 'USER_ADDED',
+                updatedAt: (spotDoc as any).updatedAt || new Date()
+              } as Spot;
+              rankedSpots.push(spotData);
+            }
+          } catch (err) {
+            console.warn(`Could not fetch spot ${spotId}:`, err);
+          }
+        }
+
+        // Sort by user's rating (highest first) for better comparison experience
+        const sortedSpots = rankedSpots.sort((a, b) => {
+          const aRanking = userRankingsList.find((r: any) => r.spotId === a.id);
+          const bRanking = userRankingsList.find((r: any) => r.spotId === b.id);
+          return (bRanking?.rating || 0) - (aRanking?.rating || 0);
+        });
+
+        setComparisonSpots(sortedSpots);
+      } catch (error) {
+        console.warn('Could not fetch user ranked spots:', error);
+        setComparisonSpots([]);
+      }
+    };
+
+    fetchUserRankedSpots();
+  }, [spot]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -407,6 +573,16 @@ export default function SpotDetailPage() {
           )}
         </View>
       </ScrollView>
+
+      {/* Ranking Popup */}
+      <RankingPopup
+        visible={showRankingPopup}
+        onClose={handleClosePopup}
+        spot={spot}
+        onSubmit={handleSubmitRanking}
+        isSubmitting={isSubmitting}
+        comparisonSpots={comparisonSpots}
+      />
     </SafeAreaView>
   );
 }

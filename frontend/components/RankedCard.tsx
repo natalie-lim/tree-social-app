@@ -1,10 +1,12 @@
+import { getRatingColor } from '@/utils/ratingColors';
 import React from 'react';
 import {
-    Dimensions,
-    Pressable,
-    StyleSheet,
-    Text,
-    View
+  Dimensions,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
 } from 'react-native';
 import { ThemedText } from './themed-text';
 
@@ -18,6 +20,7 @@ export interface UserRanking {
   note?: string;
   createdAt: any;
   updatedAt: any;
+  spotData?: any; // Full spot data for image
 }
 
 interface RankedCardProps {
@@ -28,8 +31,10 @@ interface RankedCardProps {
 
 const { width } = Dimensions.get('window');
 
+
 export function RankedCard({ ranking, onPress, style }: RankedCardProps) {
-  const accentColor = '#6FA076'; // Your app's accent color
+  const ratingColor = getRatingColor(ranking.rating);
+  const spotImage = ranking.spotData?.photos?.[0]?.url;
 
   return (
     <Pressable 
@@ -39,18 +44,32 @@ export function RankedCard({ ranking, onPress, style }: RankedCardProps) {
       <View style={styles.cardContent}>
         {/* Main Row */}
         <View style={styles.mainRow}>
-          {/* Left side - Spot info */}
-          <View style={styles.spotInfo}>
-            <ThemedText style={styles.spotName} numberOfLines={1}>
-              {ranking.spotName}
-            </ThemedText>
-            <ThemedText style={styles.spotLocation} numberOfLines={1}>
-              {ranking.spotLocation}
-            </ThemedText>
+          {/* Left side - Image and Spot info */}
+          <View style={styles.leftSection}>
+            {/* Picture square */}
+            <View style={styles.imageContainer}>
+              {spotImage ? (
+                <Image source={{ uri: spotImage }} style={styles.spotImage} resizeMode="cover" />
+              ) : (
+                <View style={styles.imagePlaceholder}>
+                  <Text style={styles.placeholderText}>📷</Text>
+                </View>
+              )}
+            </View>
+            
+            {/* Spot info */}
+            <View style={styles.spotInfo}>
+              <ThemedText style={styles.spotName} numberOfLines={1}>
+                {ranking.spotName}
+              </ThemedText>
+              <ThemedText style={styles.spotLocation} numberOfLines={1}>
+                {ranking.spotLocation}
+              </ThemedText>
+            </View>
           </View>
           
           {/* Right side - Rating circle */}
-          <View style={styles.ratingCircle}>
+          <View style={[styles.ratingCircle, { backgroundColor: ratingColor }]}>
             <Text style={styles.ratingText}>{ranking.rating.toFixed(1)}</Text>
           </View>
         </View>
@@ -95,16 +114,44 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   
-  // Main row with spot info and rating
+  // Main row with image, spot info and rating
   mainRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  spotInfo: {
+  leftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
     marginRight: 12,
+  },
+  imageContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    marginRight: 12,
+    overflow: 'hidden',
+    backgroundColor: '#f0f0f0',
+  },
+  spotImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f0f0f0',
+  },
+  placeholderText: {
+    fontSize: 20,
+    color: '#999',
+  },
+  spotInfo: {
+    flex: 1,
   },
   spotName: {
     fontSize: 16,
@@ -120,9 +167,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#6FA076',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   ratingText: {
     color: '#FFFFFF',

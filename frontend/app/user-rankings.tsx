@@ -18,12 +18,13 @@ import { userService } from '../services/natureApp';
 const PALETTE = {
   bg: "#F7F1E8",            // creamy background
   card: "#FFFFFF",
-  text: "#3E3E3E",
+  text: "#1a1a1a",
   subtext: "#6F7B6F",       // leaf green-ish for secondary
   accent: "#6FA076",        // leafy green
   accentDark: "#5C8B64",
   divider: "#E6E0D6",
 };
+
 
 export default function UserRankingsPage() {
   const { userId, userName } = useLocalSearchParams();
@@ -57,16 +58,60 @@ export default function UserRankingsPage() {
         try {
           const rankingDoc = await firestoreService.read('rankings', rankingId);
           if (rankingDoc) {
-            // Ensure the document has the required fields
+            const spotId = (rankingDoc as any).spotId || '';
+            
+            // Fetch full spot data
+            let spotData = null;
+            if (spotId) {
+              try {
+                spotData = await firestoreService.read('spots', spotId);
+              } catch (spotErr) {
+                console.warn(`Could not fetch spot ${spotId}:`, spotErr);
+              }
+            }
+
+            // Create ranking with full spot data
             const ranking: UserRanking = {
               rankingId: rankingDoc.id || rankingId,
-              spotId: (rankingDoc as any).spotId || '',
-              spotName: (rankingDoc as any).spotName || '',
-              spotLocation: (rankingDoc as any).spotLocation || '',
+              spotId: spotId,
+              spotName: spotData ? (spotData as any).name : (rankingDoc as any).spotName || '',
+              spotLocation: spotData ? (spotData as any).location?.address : (rankingDoc as any).spotLocation || '',
               rating: (rankingDoc as any).rating || 0,
               note: (rankingDoc as any).note || '',
               createdAt: (rankingDoc as any).createdAt,
-              updatedAt: (rankingDoc as any).updatedAt
+              updatedAt: (rankingDoc as any).updatedAt,
+              // Add full spot data for navigation
+              spotData: spotData ? {
+                id: spotData.id || spotId,
+                name: (spotData as any).name || (rankingDoc as any).spotName || '',
+                description: (spotData as any).description || 'No description available',
+                category: (spotData as any).category || 'No category',
+                location: (spotData as any).location || { 
+                  address: (rankingDoc as any).spotLocation || 'Unknown Location',
+                  coordinates: (spotData as any).location?.coordinates || {
+                    latitude: 0,
+                    longitude: 0
+                  }
+                },
+                photos: (spotData as any).photos || [],
+                amenities: (spotData as any).amenities || [],
+                averageRating: (spotData as any).averageRating || 0,
+                reviewCount: (spotData as any).reviewCount || 0,
+                totalRatings: (spotData as any).totalRatings || 0,
+                bestTimeToVisit: (spotData as any).bestTimeToVisit || [],
+                difficulty: (spotData as any).difficulty || 'varies',
+                distance: (spotData as any).distance || '',
+                duration: (spotData as any).duration || '',
+                elevation: (spotData as any).elevation || '',
+                isVerified: (spotData as any).isVerified || false,
+                npsCode: (spotData as any).npsCode || '',
+                website: (spotData as any).website || '',
+                tags: (spotData as any).tags || [],
+                createdAt: (spotData as any).createdAt || new Date(),
+                createdBy: (spotData as any).createdBy || '',
+                source: (spotData as any).source || 'USER_ADDED',
+                updatedAt: (spotData as any).updatedAt || new Date()
+              } : null
             };
             fullRankings.push(ranking);
           }
@@ -83,17 +128,16 @@ export default function UserRankingsPage() {
               rating: profileRanking.rating,
               note: 'No notes available',
               createdAt: profileRanking.createdAt,
-              updatedAt: profileRanking.createdAt
+              updatedAt: profileRanking.createdAt,
+              spotData: null
             });
           }
         }
       }
 
-      // Sort by most recent first (createdAt descending)
+      // Sort by rating (highest to lowest)
       const sortedRankings = fullRankings.sort((a, b) => {
-        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-        return dateB.getTime() - dateA.getTime();
+        return b.rating - a.rating;
       });
 
       console.log('Fetched full user rankings:', sortedRankings);
@@ -166,43 +210,53 @@ export default function UserRankingsPage() {
                 ranking={ranking}
                 rankNumber={index + 1}
                 onPress={(ranking) => {
-                  // Navigate to spot detail
-                  router.push({
-                    pathname: '/spot-detail',
-                    params: {
-                      spotData: JSON.stringify({
-                        id: ranking.spotId,
-                        name: ranking.spotName,
-                        description: ranking.note || 'No description available',
-                        category: 'parks_nature',
-                        location: { 
-                          address: ranking.spotLocation,
-                          coordinates: {
-                            latitude: 0,
-                            longitude: 0
-                          }
-                        },
-                        photos: [],
-                        amenities: [],
-                        averageRating: ranking.rating,
-                        reviewCount: 1,
-                        totalRatings: 1,
-                        bestTimeToVisit: [],
-                        difficulty: 'varies',
-                        distance: '',
-                        duration: '',
-                        elevation: '',
-                        isVerified: false,
-                        npsCode: '',
-                        website: '',
-                        tags: [],
-                        createdAt: ranking.createdAt || new Date(),
-                        createdBy: userId,
-                        source: 'USER_ADDED',
-                        updatedAt: ranking.updatedAt || new Date()
-                      })
-                    }
-                  });
+                  // Navigate to spot detail with full spot data
+                  if (ranking.spotData) {
+                    router.push({
+                      pathname: '/spot-detail',
+                      params: {
+                        spotData: JSON.stringify(ranking.spotData)
+                      }
+                    });
+                  } else {
+                    // Fallback to basic data if spot data not available
+                    router.push({
+                      pathname: '/spot-detail',
+                      params: {
+                        spotData: JSON.stringify({
+                          id: ranking.spotId,
+                          name: ranking.spotName,
+                          description: ranking.note || 'No description available',
+                          category: 'No category',
+                          location: { 
+                            address: ranking.spotLocation,
+                            coordinates: {
+                              latitude: 0,
+                              longitude: 0
+                            }
+                          },
+                          photos: [],
+                          amenities: [],
+                          averageRating: ranking.rating,
+                          reviewCount: 1,
+                          totalRatings: 1,
+                          bestTimeToVisit: [],
+                          difficulty: 'varies',
+                          distance: '',
+                          duration: '',
+                          elevation: '',
+                          isVerified: false,
+                          npsCode: '',
+                          website: '',
+                          tags: [],
+                          createdAt: ranking.createdAt || new Date(),
+                          createdBy: userId,
+                          source: 'USER_ADDED',
+                          updatedAt: ranking.updatedAt || new Date()
+                        })
+                      }
+                    });
+                  }
                 }}
                 style={styles.rankingCard}
               />

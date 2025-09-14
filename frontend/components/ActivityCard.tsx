@@ -1,13 +1,14 @@
 import { auth } from '@/config/firebase';
 import { firestoreService } from '@/services/firestore';
+import { getRatingColor } from '@/utils/ratingColors';
 import React, { useState } from 'react';
 import {
-    Alert,
-    Animated,
-    Image,
-    Pressable,
-    StyleSheet,
-    View
+  Alert,
+  Animated,
+  Image,
+  Pressable,
+  StyleSheet,
+  View
 } from 'react-native';
 import { ThemedText } from './themed-text';
 
@@ -174,12 +175,6 @@ export function ActivityCard({
     }
   };
 
-  const getRatingColor = (rating: number) => {
-    if (rating >= 8) return '#4CAF50';
-    if (rating >= 6) return '#FF9800';
-    if (rating >= 4) return '#FF5722';
-    return '#9E9E9E';
-  };
 
   const getTimeAgo = (timestamp: any) => {
     const now = new Date();

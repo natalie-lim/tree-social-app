@@ -6,7 +6,7 @@ import MapView, { Marker, PROVIDER_GOOGLE, LatLng } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useNavigation } from "expo-router";
 
-import { collection, getDocs, onSnapshot, QuerySnapshot } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../config/firebase";
 
 type Place = { id: string; title?: string; latitude: number; longitude: number };
@@ -30,28 +30,31 @@ export default function MapScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      try {
-        // ----- Replace this block with your Firestore fetch -----
-        const snap = await getDocs(collection(db, "places"));
-        const pts: Place[] = snap.docs.map(d => {
-          const x = d.data() as any;
-          return { id: d.id, title: x.title ?? "Untitled", latitude: +x.lat, longitude: +x.lng };
-        });
+    const unsub = onSnapshot(
+      collection(db, "spots"),
+      (snap) => {
+        const pts: Place[] = snap.docs
+          .map((d) => {
+            const x = d.data() as any;
+            const lat = Number(x?.location?.coordinates?.latitude);
+            const lng = Number(x?.location?.coordinates?.longitude);
+            return {
+              id: d.id,
+              title: x?.location?.name ?? "Untitled",
+              latitude: lat,
+              longitude: lng,
+            };
+          })
+          .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude));
         setPlaces(pts);
-        // --------------------------------------------------------
-
-        // Demo points so the screen renders while you wire Firestore:
-        setPlaces([
-          { id: "1", title: "Center City", latitude: 39.9526, longitude: -75.1652 },
-          { id: "2", title: "Penn",        latitude: 39.9522, longitude: -75.1932 },
-        ]);
-      } catch (e) {
-        console.warn("Failed to load places:", e);
-      } finally {
+        setLoading(false);
+      },
+      (err) => {
+        console.warn("Firestore error:", err);
         setLoading(false);
       }
-    })();
+    );
+    return unsub;
   }, []);
 
   const initialRegion = useMemo(() => {

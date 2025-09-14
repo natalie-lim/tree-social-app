@@ -1,16 +1,17 @@
+import { HapticTab } from "@/components/haptic-tab";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useRefresh } from "@/contexts/RefreshContext";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Tabs } from "expo-router";
 import * as React from "react";
 import {
-  View,
+  Platform,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  Platform,
+  View,
 } from "react-native";
-import { HapticTab } from "@/components/haptic-tab";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const THEME = {
@@ -112,6 +113,7 @@ function CurvyTabBar({
   theme,
 }: BottomTabBarProps & { theme: typeof THEME }) {
   const insets = useSafeAreaInsets();
+  const { refreshProfile } = useRefresh();
 
   return (
     <View
@@ -134,8 +136,14 @@ function CurvyTabBar({
               target: route.key,
               canPreventDefault: true,
             });
-            if (!isFocused && !event.defaultPrevented)
+            if (!isFocused && !event.defaultPrevented) {
               navigation.navigate(route.name);
+            }
+            
+            // Trigger refresh when profile tab is pressed
+            if (route.name === 'profile') {
+              refreshProfile();
+            }
           };
 
           const color = isFocused

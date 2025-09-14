@@ -1,16 +1,18 @@
 import { Redirect } from "expo-router";
-import { ActivityIndicator, View } from "react-native";
+import { CuteLoading } from "../components/CuteLoading";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function Index() {
   const { user, loading } = useAuth();
 
-  // Show loading spinner while checking authentication state
+  // Show cute loading spinner while checking authentication state
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" />
-      </View>
+      <CuteLoading 
+        message="welcome to leaflet" 
+        size="large" 
+        showMessage={true} 
+      />
     );
   }
 

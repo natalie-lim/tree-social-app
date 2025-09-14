@@ -4,16 +4,17 @@ import { ThemedText } from "@/components/themed-text";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Image,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
+import { CuteLoading } from "../../components/CuteLoading";
 import { useAuth } from "../../contexts/AuthContext";
+import { useRefresh } from "../../contexts/RefreshContext";
 import { firestoreService } from "../../services/firestore";
 import { userService } from "../../services/natureApp";
 
@@ -75,6 +76,7 @@ const ListRow = ({ icon = "✓", label, value, onPress }: ListRowProps) => (
 
 export default function Profile() {
   const { user, loading: authLoading } = useAuth();
+  const { shouldRefreshProfile, clearRefreshFlag } = useRefresh();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userRankings, setUserRankings] = useState<UserRanking[]>([]);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -181,6 +183,15 @@ export default function Profile() {
     fetchUserProfile();
   }, [user]);
 
+  // Handle refresh trigger from tab press
+  useEffect(() => {
+    if (shouldRefreshProfile && user) {
+      console.log('Refreshing profile due to tab press');
+      refreshProfile();
+      clearRefreshFlag();
+    }
+  }, [shouldRefreshProfile, user]);
+
   // Add refresh functionality
   const refreshProfile = async () => {
     if (!user) return;
@@ -214,10 +225,11 @@ export default function Profile() {
   if (authLoading || profileLoading) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={PALETTE.accent} />
-          <Text style={styles.loadingText}>Loading profile...</Text>
-        </View>
+        <CuteLoading 
+          message="Loading your profile..." 
+          size="medium" 
+          showMessage={true} 
+        />
       </SafeAreaView>
     );
   }

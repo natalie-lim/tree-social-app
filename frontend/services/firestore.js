@@ -182,3 +182,38 @@ export const postsService = {
     return await firestoreService.delete('posts', postId);
   }
 };
+
+// Spots service
+export const spotsService = {
+  async createSpot(spotData) {
+    return await firestoreService.create('spots', spotData);
+  },
+
+  async getSpots(limitCount = 20) {
+    return await firestoreService.query('spots', [], 'createdAt', limitCount);
+  },
+
+  async getSpotById(spotId) {
+    return await firestoreService.read('spots', spotId);
+  },
+
+  async getUserSpots(userId) {
+    return await firestoreService.query('spots', [
+      { field: 'createdBy', operator: '==', value: userId }
+    ], 'createdAt');
+  },
+
+  async updateSpot(spotId, spotData) {
+    return await firestoreService.update('spots', spotId, spotData);
+  },
+
+  async deleteSpot(spotId) {
+    return await firestoreService.delete('spots', spotId);
+  },
+
+  async searchSpots(searchTerm, limitCount = 20) {
+    // This would need to be implemented with proper text search
+    // For now, we'll use the existing search functionality
+    return await firestoreService.query('spots', [], 'name', limitCount);
+  }
+};

@@ -134,18 +134,24 @@ export async function searchFirestore(
     });
   } else {
     const ref = collection(db, "users");
-    const formattedQuery = toTitleCase(queryInput);
+    const normalizedQuery = normalize(queryInput); // Convert to lowercase for comparison
 
-    const queryRef = q(
-      ref,
-      orderBy("displayName"),
-      startAt(formattedQuery),
-      endAt(formattedQuery + "\uf8ff"),
-      qLimit(20)
-    );
+    // Get users and filter client-side to handle mixed case displayNames
+    const queryRef = q(ref, qLimit(100)); // Get more users to filter from
     const snap = await getDocs(queryRef);
-    console.log("Found users:", snap.docs.length);
-    return snap.docs.map((d) => {
+
+    // Filter users where displayName starts with the normalized query (case-insensitive)
+    const filteredUsers = snap.docs
+      .filter((d) => {
+        const u = d.data() as UserLite;
+        const displayName = u?.displayName || "";
+        const normalizedDisplayName = normalize(displayName);
+        return normalizedDisplayName.startsWith(normalizedQuery);
+      })
+      .slice(0, 20); // Limit to 20 results
+
+    console.log("Found users:", filteredUsers.length);
+    return filteredUsers.map((d) => {
       const u = d.data() as UserLite;
       const title = u?.handle ? `@${u.handle}` : u?.displayName || "(user)";
       const subtitle =

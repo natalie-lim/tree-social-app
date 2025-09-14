@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { firestoreService } from "../../services/firestore";
+import { CuteLoading } from "@/components/CuteLoading";
 
 // ---------- THEME ----------
 const THEME = {
@@ -138,8 +139,7 @@ export default function Leaderboard() {
     return (
       <View style={styles.screen}>
         <View style={styles.centerBox}>
-          <ActivityIndicator size="large" color={THEME.primary} />
-          <Text style={styles.loadingText}>Loading leaderboard…</Text>
+          <CuteLoading message="Loading leaderboard…" size="large" />
         </View>
       </View>
     );

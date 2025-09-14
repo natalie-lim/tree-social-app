@@ -1,14 +1,28 @@
 import { getRatingColor } from "@/utils/ratingColors";
 import { router } from "expo-router";
-import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
-import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Dimensions, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { db } from "../config/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { rankingsService } from "../services/firestore";
 import { ThemedText } from "./themed-text";
 
-// Types based on the document structure
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  increment,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  runTransaction,
+  serverTimestamp,
+  where,
+} from "firebase/firestore";
+
 export interface SpotPhoto {
   caption: string;
   credit: string;
@@ -32,8 +46,8 @@ export interface Spot {
   photos: SpotPhoto[];
   amenities: string[];
   averageRating: number;
-  reviewCount: number;
-  totalRatings: number;
+  reviewCount: number; // comments count
+  totalRatings: number; // likes count
   bestTimeToVisit: string[];
   difficulty: string;
   distance: string;
@@ -60,6 +74,14 @@ interface SpotCardProps {
   userRating?: number;
 }
 
+type SpotComment = {
+  id: string;
+  text: string;
+  userId: string;
+  displayName?: string;
+  createdAt?: any;
+};
+
 const { width } = Dimensions.get("window");
 
 export function SpotCard({
@@ -73,11 +95,23 @@ export function SpotCard({
   userRating,
 }: SpotCardProps) {
   const { user } = useAuth();
-  const [resolvedName, setResolvedName] = useState<string | undefined>(
-    userDisplayName
-  );
+
+  const [resolvedName, setResolvedName] = useState<string | undefined>(userDisplayName);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
+
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState<number>(
+    typeof spot.totalRatings === "number" ? spot.totalRatings : 0
+  );
+  const [isLikeLoading, setIsLikeLoading] = useState(false);
+
+  const [commentText, setCommentText] = useState("");
+  const [comments, setComments] = useState<SpotComment[]>([]);
+  const [commentCount, setCommentCount] = useState<number>(
+    typeof spot.reviewCount === "number" ? spot.reviewCount : 0
+  );
+  const [isCommentLoading, setIsCommentLoading] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -94,14 +128,10 @@ export function SpotCard({
           if (!alive) return;
           if (!qs.empty) {
             const u = qs.docs[0].data() as any;
-            setResolvedName(
-              u.displayName || u.name || u.username || userName || "User"
-            );
+            setResolvedName(u.displayName || u.name || u.username || userName || "User");
             return;
           }
-        } catch {
-          // ignore
-        }
+        } catch {}
       }
       setResolvedName(userName || "User");
     }
@@ -112,68 +142,187 @@ export function SpotCard({
     };
   }, [rankingUserId, userDisplayName, userName]);
 
-  // Check if spot is bookmarked
   useEffect(() => {
     const checkBookmarkStatus = async () => {
       if (!user || !spot.id) return;
-      
       try {
         const bookmarks = await rankingsService.getUserBookmarks(user.uid);
         setIsBookmarked(bookmarks.includes(spot.id));
       } catch (error) {
-        console.error('Error checking bookmark status:', error);
+        console.error("Error checking bookmark status:", error);
       }
     };
-
     checkBookmarkStatus();
   }, [user, spot.id]);
 
-  // Title case helper
+  // LIVE counts: subscribe to spot doc for like/comment counters
+  useEffect(() => {
+    if (!spot?.id) return;
+    const spotRef = doc(db, "spots", spot.id);
+    const unsub = onSnapshot(spotRef, (snap) => {
+      if (!snap.exists()) return;
+      const d = snap.data();
+      if (typeof d.totalRatings === "number") setLikeCount(d.totalRatings);
+      if (typeof d.reviewCount === "number") setCommentCount(d.reviewCount);
+    });
+    return () => unsub();
+  }, [spot?.id]);
+
+  // INIT like state for this user
+  useEffect(() => {
+    let alive = true;
+
+    const initLikeState = async () => {
+      if (!user || !spot?.id) return;
+      try {
+        const likeRef = doc(db, "spots", spot.id, "likes", user.uid);
+        const likeSnap = await getDoc(likeRef);
+        if (!alive) return;
+        setIsLiked(likeSnap.exists());
+      } catch (e) {
+        console.log("initLikeState error:", e);
+      }
+    };
+
+    initLikeState();
+    return () => {
+      alive = false;
+    };
+  }, [user, spot?.id]);
+
+  // LIVE latest 3 comments
+  useEffect(() => {
+    if (!spot?.id) return;
+    const commentsRef = collection(db, "spots", spot.id, "comments");
+    const q = query(commentsRef, orderBy("createdAt", "desc"), limit(3));
+    const unsub = onSnapshot(q, (snap) => {
+      const list: SpotComment[] = [];
+      snap.forEach((docSnap) => {
+        const d = docSnap.data() as any;
+        list.push({
+          id: docSnap.id,
+          text: d.text,
+          userId: d.userId,
+          displayName: d.displayName,
+          createdAt: d.createdAt,
+        });
+      });
+      setComments(list);
+    });
+    return () => unsub();
+  }, [spot?.id]);
+
   const toTitleCase = (name: string) =>
     name.replace(/\w\S*/g, (txt) => txt[0].toUpperCase() + txt.slice(1).toLowerCase());
 
-  // Navigation helpers
-  // SpotCard.tsx
   const goToUser = () => {
     if (!rankingUserId) return;
     router.push(`/user/${encodeURIComponent(rankingUserId)}`);
   };
 
-  // Bookmark functionality
   const handleBookmarkToggle = async () => {
     if (!user || !spot.id) return;
-    
-    // Check if user is trying to bookmark their own spot
     if (rankingUserId === user.uid) {
       Alert.alert("Cannot bookmark", "You cannot bookmark your own spots");
       return;
     }
-
     setIsBookmarkLoading(true);
-    
     try {
       await rankingsService.toggleBookmark(user.uid, spot.id);
-      setIsBookmarked(!isBookmarked);
+      setIsBookmarked((prev) => !prev);
     } catch (error) {
-      console.error('Error toggling bookmark:', error);
+      console.error("Error toggling bookmark:", error);
       Alert.alert("Error", "Failed to update bookmark");
     } finally {
       setIsBookmarkLoading(false);
     }
   };
 
+  const handleLikeToggle = async () => {
+    if (!user || !spot?.id) return;
+    setIsLikeLoading(true);
 
+    const spotRef = doc(db, "spots", spot.id);
+    const likeRef = doc(db, "spots", spot.id, "likes", user.uid);
 
+    const wasLiked = isLiked;
+    setIsLiked(!wasLiked);
+    setLikeCount((c) => (wasLiked ? Math.max(0, c - 1) : c + 1));
 
+    try {
+      await runTransaction(db, async (tx) => {
+        const likeSnap = await tx.get(likeRef);
+        if (likeSnap.exists()) {
+          tx.delete(likeRef);
+          tx.update(spotRef, {
+            totalRatings: increment(-1),
+            updatedAt: serverTimestamp(),
+          });
+        } else {
+          tx.set(likeRef, {
+            userId: user.uid,
+            createdAt: serverTimestamp(),
+          });
+          tx.update(spotRef, {
+            totalRatings: increment(1),
+            updatedAt: serverTimestamp(),
+          });
+        }
+      });
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      setIsLiked(wasLiked);
+      setLikeCount((c) => (wasLiked ? c + 1 : Math.max(0, c - 1)));
+      Alert.alert("Error", "Failed to update like");
+    } finally {
+      setIsLikeLoading(false);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!user || !spot?.id) return;
+    const trimmed = commentText.trim();
+    if (!trimmed) return;
+
+    setIsCommentLoading(true);
+    try {
+      const commentsRef = collection(db, "spots", spot.id, "comments");
+      const displayName =
+        (user as any)?.displayName ||
+        (user as any)?.email?.split("@")[0] ||
+        "User";
+
+      await addDoc(commentsRef, {
+        text: trimmed,
+        userId: user.uid,
+        displayName,
+        createdAt: serverTimestamp(),
+      });
+
+      // increment comment counter on spot
+      const spotRef = doc(db, "spots", spot.id);
+      await runTransaction(db, async (tx) => {
+        tx.update(spotRef, {
+          reviewCount: increment(1),
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      setCommentText("");
+      setCommentCount((c) => c + 1);
+    } catch (e) {
+      console.error("add comment error:", e);
+      Alert.alert("Error", "Failed to post comment");
+    } finally {
+      setIsCommentLoading(false);
+    }
+  };
 
   return (
     <Pressable style={[styles.card, style]} onPress={() => onPress?.(spot)}>
       <View style={styles.cardContent}>
-        {/* Main Row */}
         <View style={styles.mainRow}>
-          {/* Left side - Spot info */}
           <View style={styles.spotInfo}>
-            {/* High-contrast header line with links */}
             <View style={styles.spotNameRow}>
               <Pressable onPress={goToUser} accessibilityRole="link" hitSlop={6}>
                 <Text style={[styles.spotName, styles.spotNameLink]}>
@@ -183,41 +332,38 @@ export function SpotCard({
               <Text style={[styles.spotName, styles.spotNameRegular]}> explored </Text>
               <Text style={[styles.spotName, styles.spotNameStrong]}>{spot.name}</Text>
             </View>
-
-
-            {/* Address */}
             <ThemedText style={styles.spotLocation} numberOfLines={1}>
               {spot.location.address}
             </ThemedText>
           </View>
 
-          {/* Right side - Rating circle */}
-          {(userRating && userRating > 0) ? (
+          {userRating !== undefined && userRating !== null ? (
             <View
               style={[
                 styles.ratingCircle,
                 { backgroundColor: getRatingColor(userRating) },
               ]}
             >
-              <Text style={styles.ratingText}>
-                {userRating.toFixed(1)}
-              </Text>
+              <Text style={styles.ratingText}>{userRating.toFixed(1)}</Text>
             </View>
-          ) : spot.averageRating > 0 ? (
+          ) : spot.averageRating !== undefined &&
+            spot.averageRating !== null &&
+            spot.averageRating > 0 ? (
             <View
               style={[
                 styles.ratingCircle,
                 { backgroundColor: getRatingColor(spot.averageRating) },
               ]}
             >
-              <Text style={styles.ratingText}>
-                {spot.averageRating.toFixed(1)}
-              </Text>
+              <Text style={styles.ratingText}>{spot.averageRating.toFixed(1)}</Text>
             </View>
-          ) : null}
+          ) : (
+            <View style={[styles.ratingCircle, { backgroundColor: "#6B7280" }]}>
+              <Text style={styles.ratingText}>?</Text>
+            </View>
+          )}
         </View>
 
-        {/* User Notes Section */}
         <View style={styles.notesSection}>
           <ThemedText style={styles.notesLabel}>Your Notes:</ThemedText>
           <ThemedText style={styles.notesText}>
@@ -225,33 +371,81 @@ export function SpotCard({
           </ThemedText>
         </View>
 
-        {/* Comments, Likes, and Bookmarks Section */}
         <View className="social" style={styles.socialSection}>
           <View style={styles.socialItem}>
             <Text style={styles.socialIcon}>💬</Text>
             <ThemedText style={styles.socialText}>
-              {spot.reviewCount || 0} comments
+              {commentCount} {commentCount === 1 ? "comment" : "comments"}
             </ThemedText>
           </View>
+
           <View style={styles.socialItem}>
-            <Text style={styles.socialIcon}>❤️</Text>
-            <ThemedText style={styles.socialText}>
-              {spot.totalRatings || 0} likes
-            </ThemedText>
+            <Pressable
+              onPress={handleLikeToggle}
+              disabled={isLikeLoading || !user}
+              style={{ flexDirection: "row", alignItems: "center" }}
+              accessibilityRole="button"
+              accessibilityLabel={isLiked ? "Unlike spot" : "Like spot"}
+            >
+              <Text style={styles.socialIcon}>{isLiked ? "❤️" : "🤍"}</Text>
+              <ThemedText style={styles.socialText}>
+                {likeCount} {likeCount === 1 ? "like" : "likes"}
+              </ThemedText>
+            </Pressable>
           </View>
-          <Pressable 
-            style={styles.socialItem} 
+
+          <Pressable
+            style={styles.socialItem}
             onPress={handleBookmarkToggle}
             disabled={isBookmarkLoading || rankingUserId === user?.uid}
           >
-            <Text style={styles.socialIcon}>
-              {isBookmarked ? '🔖' : '📖'}
-            </Text>
+            <Text style={styles.socialIcon}>{isBookmarked ? "🔖" : "📖"}</Text>
             <ThemedText style={styles.socialText}>
-              {isBookmarked ? 'bookmarked' : 'bookmark'}
+              {isBookmarked ? "bookmarked" : "bookmark"}
             </ThemedText>
           </Pressable>
         </View>
+
+        {/* Comment composer */}
+        <View style={styles.commentComposer}>
+          <TextInput
+            value={commentText}
+            onChangeText={setCommentText}
+            placeholder={user ? "Add a comment…" : "Sign in to comment"}
+            editable={!!user && !isCommentLoading}
+            style={styles.commentInput}
+            multiline
+          />
+          <Pressable
+            onPress={handleAddComment}
+            disabled={!user || isCommentLoading || !commentText.trim()}
+            style={[
+              styles.commentButton,
+              (!user || isCommentLoading || !commentText.trim()) && { opacity: 0.5 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Post comment"
+          >
+            <Text style={styles.commentButtonText}>{isCommentLoading ? "Posting…" : "Post"}</Text>
+          </Pressable>
+        </View>
+
+        {/* Latest comments */}
+        {comments.length > 0 && (
+          <View style={styles.commentsList}>
+            {comments.map((c) => (
+              <View key={c.id} style={styles.commentItem}>
+                <Text style={styles.commentAuthor}>{c.displayName || "User"}</Text>
+                <Text style={styles.commentTextBody}>{c.text}</Text>
+              </View>
+            ))}
+            {commentCount > comments.length && (
+              <Text style={styles.viewAllHint}>
+                View all {commentCount} comments
+              </Text>
+            )}
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -272,8 +466,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     padding: 16,
   },
-
-  // Main row with spot info and rating
   mainRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -284,30 +476,22 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
-
-  // Title line ("Evie explored Half Dome Trail")
   spotName: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#1A1A1A", // darker base color
+    color: "#1A1A1A",
     marginBottom: 4,
   },
-  // Ensure inner fragments keep the same dark color
   spotNameStrong: { color: "#1A1A1A", fontWeight: "700" },
   spotNameRegular: { color: "#1A1A1A", fontWeight: "400" },
-
-  // Username styled as a link
   spotNameLink: {
-    color: "#2F4A43", // brand green
+    color: "#2F4A43",
     fontWeight: "700",
   },
-
-  // Address
   spotLocation: {
     fontSize: 14,
-    color: "#6B7280", // regular text color
+    color: "#6B7280",
   },
-
   ratingCircle: {
     width: 40,
     height: 40,
@@ -320,8 +504,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
   },
-
-  // Notes section
   notesSection: {
     marginBottom: 12,
     paddingVertical: 8,
@@ -340,14 +522,13 @@ const styles = StyleSheet.create({
     color: "#374151",
     fontStyle: "italic",
   },
-
-  // Social section
   socialSection: {
     flexDirection: "row",
     justifyContent: "space-around",
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: "#E5E7EB",
+    marginBottom: 8,
   },
   socialItem: {
     flexDirection: "row",
@@ -365,7 +546,62 @@ const styles = StyleSheet.create({
   spotNameRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    alignItems: "baseline", // makes text align better on first line
+    alignItems: "baseline",
   },
-
+  commentComposer: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  commentInput: {
+    flex: 1,
+    minHeight: 40,
+    maxHeight: 100,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    fontSize: 14,
+    color: "#1F2937",
+    backgroundColor: "#FAFAFA",
+  },
+  commentButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#2F4A43",
+    borderRadius: 8,
+  },
+  commentButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  commentsList: {
+    marginTop: 8,
+    gap: 8,
+  },
+  commentItem: {
+    flexDirection: "column",
+    backgroundColor: "#F9FAFB",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  commentAuthor: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 2,
+  },
+  commentTextBody: {
+    fontSize: 14,
+    color: "#374151",
+  },
+  viewAllHint: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#6B7280",
+  },
 });

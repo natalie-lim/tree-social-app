@@ -3,6 +3,7 @@ import { Spot, SpotCard } from "@/components/SpotCard";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
+import { CuteLoading } from "@/components/CuteLoading";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -176,16 +177,6 @@ export default function Feed() {
       {/* Top bar */}
       <View style={styles.topRow}>
         <Text style={styles.brand}>leaflet</Text>
-
-        <View style={styles.icons}>
-          <Ionicons name="calendar-outline" size={22} color={COLORS.text} />
-          <Ionicons
-            name="notifications-outline"
-            size={22}
-            color={COLORS.text}
-            style={{ marginLeft: 14 }}
-          />
-        </View>
       </View>
 
       {/* Search bar */}
@@ -199,16 +190,6 @@ export default function Feed() {
 
       {/* Pills row */}
       <View style={styles.pillsRow}>
-        <Pill
-          icon="calendar-outline"
-          label="Add Place"
-          onPress={() => router.push("/add-place")}
-        />
-        <Pill
-          icon="navigate-outline"
-          label="Open Map"
-          onPress={() => router.push("/map")}
-        />
       </View>
 
       {/* Feed content */}
@@ -223,9 +204,8 @@ export default function Feed() {
       )}
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.brand} />
-          <Text style={styles.loadingText}>Loading spots...</Text>
+        <View style={styles.loadingWrap}>
+          <CuteLoading message="Loading spots..." size="large" />
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
@@ -412,5 +392,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.brand,
     fontWeight: "500",
+  },
+    loadingWrap: {
+    minHeight: 260,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

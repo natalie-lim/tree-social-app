@@ -1,181 +1,125 @@
-import React, { useEffect, useRef } from 'react';
-import {
-    Animated,
-    Dimensions,
-    Easing,
-    StyleSheet,
-    Text,
-    View,
-} from 'react-native';
-import { ThemedText } from './themed-text';
-
-const { width: screenWidth } = Dimensions.get('window');
+import React, { useEffect, useRef } from "react";
+import { Animated, Easing, Image, StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { ThemedText } from "./themed-text";
 
 interface CuteLoadingProps {
   message?: string;
-  size?: 'small' | 'medium' | 'large';
+  size?: "small" | "medium" | "large";
   showMessage?: boolean;
 }
 
 const THEME = {
-  bg: '#F5F5DC', // beige background
-  primary: '#2D5016', // dark green
-  secondary: '#228B22', // forest green
-  accent: '#32CD32', // lime green
-  text: '#1E3A0F', // darker green
-  textSecondary: '#2D5016',
+  bg: "#FFF6EC",     // background color
+  green: "#2F8C46",  // bottom-bar green
 };
 
-export function CuteLoading({ 
-  message = "Loading...", 
-  size = 'medium',
-  showMessage = true 
+export function CuteLoading({
+  message = "Loading...",
+  size = "medium",
+  showMessage = true,
 }: CuteLoadingProps) {
-  const leafAnimation = useRef(new Animated.Value(0)).current;
-  const pulseAnimation = useRef(new Animated.Value(1)).current;
-  const bounceAnimation = useRef(new Animated.Value(0)).current;
-  const dotsAnimation = useRef(new Animated.Value(0)).current;
+  // Animations
+  const ringSpin = useRef(new Animated.Value(0)).current;   // outer ring rotation
+  const leafSway = useRef(new Animated.Value(0)).current;   // leaf sway
+  const bgSpin  = useRef(new Animated.Value(0)).current;    // background image rotation
+  const bgPulse = useRef(new Animated.Value(0)).current;    // background image scale/opacity
 
   useEffect(() => {
-    // Leaf rotation animation
-    const leafRotate = Animated.loop(
-      Animated.timing(leafAnimation, {
+    // Ring: constant rotation
+    Animated.loop(
+      Animated.timing(ringSpin, {
         toValue: 1,
-        duration: 2000,
+        duration: 1600,
         easing: Easing.linear,
         useNativeDriver: true,
       })
-    );
+    ).start();
 
-    // Pulse animation for the main circle
-    const pulse = Animated.loop(
+    // Leaf: gentle sway
+    Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnimation, {
-          toValue: 1.2,
-          duration: 800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnimation, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
+        Animated.timing(leafSway, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(leafSway, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ])
-    );
+    ).start();
 
-    // Bounce animation for the container
-    const bounce = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bounceAnimation, {
-          toValue: -10,
-          duration: 1000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(bounceAnimation, {
-          toValue: 0,
-          duration: 1000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    // Dots animation
-    const dots = Animated.loop(
-      Animated.timing(dotsAnimation, {
+    // Background solar wind: slow spin
+    Animated.loop(
+      Animated.timing(bgSpin, {
         toValue: 1,
-        duration: 1500,
-        easing: Easing.inOut(Easing.ease),
+        duration: 6000,
+        easing: Easing.linear,
         useNativeDriver: true,
       })
-    );
+    ).start();
 
-    leafRotate.start();
-    pulse.start();
-    bounce.start();
-    dots.start();
+    // Background solar wind: subtle pulse
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bgPulse, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(bgPulse, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+  }, [ringSpin, leafSway, bgSpin, bgPulse]);
 
-    return () => {
-      leafRotate.stop();
-      pulse.stop();
-      bounce.stop();
-      dots.stop();
-    };
-  }, []);
-
-  const getSize = () => {
-    switch (size) {
-      case 'small': return { container: 60, leaf: 30, text: 14 };
-      case 'large': return { container: 120, leaf: 60, text: 18 };
-      default: return { container: 80, leaf: 40, text: 16 };
-    }
+  // Sizes
+  const SIZES: Record<NonNullable<CuteLoadingProps["size"]>, { ring: number; ringW: number; icon: number; text: number; bg: number }> = {
+    small:  { ring: 64,  ringW: 3, icon: 36, text: 12, bg: 56 },
+    medium: { ring: 92,  ringW: 3, icon: 56, text: 14, bg: 84 },
+    large:  { ring: 128, ringW: 4, icon: 84, text: 16, bg: 116 },
   };
+  const s = SIZES[size];
 
-  const sizes = getSize();
+  // Interpolations
+  const ringRotate = ringSpin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
+  const leafRotate = leafSway.interpolate({ inputRange: [0, 1], outputRange: ["-12deg", "12deg"] });
+  const leafShiftX = leafSway.interpolate({ inputRange: [0, 1], outputRange: [-4, 4] });
 
-  const leafRotation = leafAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const dotsOpacity = dotsAnimation.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.3, 1, 0.3],
-  });
+  const bgRotate = bgSpin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
+  const bgScale  = bgPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+  const bgOpacity = bgPulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.85] });
 
   return (
-    <View style={styles.container}>
-      <Animated.View 
-        style={[
-          styles.loadingContainer,
-          {
-            transform: [
-              { translateY: bounceAnimation },
-              { scale: pulseAnimation }
-            ]
-          }
-        ]}
-      >
-        {/* Main circle with gradient effect */}
-        <View style={[styles.mainCircle, { width: sizes.container, height: sizes.container }]}>
-          <View style={[styles.innerCircle, { width: sizes.container * 0.7, height: sizes.container * 0.7 }]}>
-            {/* Rotating leaf */}
-            <Animated.View
-              style={[
-                styles.leafContainer,
-                {
-                  transform: [{ rotate: leafRotation }],
-                  width: sizes.leaf,
-                  height: sizes.leaf,
-                }
-              ]}
-            >
-              <Text style={[styles.leaf, { fontSize: sizes.leaf }]}>🍃</Text>
-            </Animated.View>
-          </View>
-        </View>
+    <View style={[styles.root, { backgroundColor: THEME.bg }]}>
+      {/* Wrapper ensures perfect centering of all layers */}
+      <View style={[styles.wrapper, { width: s.ring, height: s.ring }]}>
+        {/* Rotating ring */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.ring,
+            {
+              width: s.ring,
+              height: s.ring,
+              borderRadius: s.ring / 2,
+              borderWidth: s.ringW,
+              borderColor: THEME.green,
+              borderTopColor: "transparent",
+              transform: [{ rotate: ringRotate }],
+            },
+          ]}
+        />
 
-        {/* Floating particles */}
-        <View style={styles.particles}>
-          <View style={[styles.particle, styles.particle1]} />
-          <View style={[styles.particle, styles.particle2]} />
-          <View style={[styles.particle, styles.particle3]} />
-        </View>
-      </Animated.View>
+        {/* Centered, swaying leaf */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            alignItems: "center",
+            justifyContent: "center",
+            transform: [{ translateX: leafShiftX }, { rotate: leafRotate }],
+          }}
+        >
+          <Ionicons name="leaf" size={s.icon} color={THEME.green} />
+        </Animated.View>
+      </View>
 
       {showMessage && (
-        <View style={styles.messageContainer}>
-          <ThemedText style={[styles.message, { fontSize: sizes.text }]}>
+        <View style={{ marginTop: 16 }}>
+          <ThemedText style={{ color: THEME.green, fontWeight: "600", fontSize: s.text, textAlign: "center" }}>
             {message}
           </ThemedText>
-          <View style={styles.dotsContainer}>
-            <Animated.Text style={[styles.dots, { opacity: dotsOpacity }]}>
-              ●●●
-            </Animated.Text>
-          </View>
         </View>
       )}
     </View>
@@ -183,88 +127,22 @@ export function CuteLoading({
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: THEME.bg,
-    paddingHorizontal: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+  wrapper: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  mainCircle: {
-    borderRadius: 50,
-    backgroundColor: THEME.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: THEME.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+  ring: {
+    position: "absolute",
+    top: 0,
+    left: 0,
   },
-  innerCircle: {
-    borderRadius: 50,
-    backgroundColor: THEME.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: THEME.secondary,
-  },
-  leafContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  leaf: {
-    textAlign: 'center',
-  },
-  particles: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-  },
-  particle: {
-    position: 'absolute',
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: THEME.accent,
-  },
-  particle1: {
-    top: 10,
-    left: 20,
-    opacity: 0.7,
-  },
-  particle2: {
-    top: 30,
-    right: 15,
-    opacity: 0.5,
-  },
-  particle3: {
-    bottom: 20,
-    left: 30,
-    opacity: 0.6,
-  },
-  messageContainer: {
-    marginTop: 30,
-    alignItems: 'center',
-  },
-  message: {
-    color: THEME.text,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  dotsContainer: {
-    height: 20,
-    justifyContent: 'center',
-  },
-  dots: {
-    color: THEME.secondary,
-    fontSize: 16,
-    textAlign: 'center',
+  bgImg: {
+    position: "absolute",
   },
 });

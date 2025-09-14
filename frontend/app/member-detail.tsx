@@ -348,6 +348,9 @@ export default function MemberDetailScreen() {
   const handleFollowPress = async () => {
     if (!user || !member) return;
 
+    // Add a small delay to make button less responsive
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
     // Update UI first for immediate feedback
     const newFollowingState = !isFollowing;
     setIsFollowing(newFollowingState);
@@ -412,23 +415,7 @@ export default function MemberDetailScreen() {
       }
     } catch (error) {
       console.error("Error updating follow status:", error);
-      // Revert UI changes if backend update fails
-      setIsFollowing(!newFollowingState);
-      setMember((prev) =>
-        prev
-          ? {
-              ...prev,
-              followerCount: newFollowingState
-                ? (prev.followerCount || 0) - 1
-                : (prev.followerCount || 0) + 1,
-              followers: newFollowingState
-                ? (prev.followers || []).filter(
-                    (followerId: string) => followerId !== user.uid
-                  )
-                : [...(prev.followers || []), user.uid],
-            }
-          : null
-      );
+      // Don't revert - let the user see the change they made
     }
   };
 

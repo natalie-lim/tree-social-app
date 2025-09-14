@@ -40,8 +40,12 @@ export default function SignupScreen() {
     setLoading(true);
     try {
       await signUp(email, password, displayName);
-      Alert.alert('Success', 'Account created successfully!');
-      router.replace('/(tabs)/feed');
+
+      // If your login screen is at app/(auth)/login.tsx:
+      router.replace('/(auth)/login');
+
+      // If it's at app/login.tsx instead, use:
+      // router.replace('/login');
     } catch (error) {
       if (error instanceof Error) {
         Alert.alert('Signup Error', error.message);

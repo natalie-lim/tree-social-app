@@ -168,12 +168,12 @@ export default function MapScreen() {
         </View>
       ) : (
         <MapView
-          ref={(r) => (mapRef.current = r)}
+          ref={mapRef}
           style={{ flex: 1 }}
-          provider={PROVIDER_GOOGLE} 
+          provider={PROVIDER_GOOGLE}
           customMapStyle={COLORFUL_MAP_STYLE}
           initialRegion={initialRegion}
-          showsUserLocation // blue dot
+          showsUserLocation
           followsUserLocation={false}
           showsMyLocationButton={Platform.OS === "android"}
         >

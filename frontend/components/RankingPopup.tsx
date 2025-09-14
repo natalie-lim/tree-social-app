@@ -7,7 +7,6 @@ import {
   Dimensions,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -201,7 +200,7 @@ export default function RankingPopup({
             </Pressable>
           </View>
 
-          <ScrollView style={styles.scrollView}>
+          <View style={styles.contentContainer}>
             {/* Quick Rating */}
             <View style={styles.ratingSection}>
               <ThemedText style={styles.sectionTitle}>How was it?</ThemedText>
@@ -341,7 +340,7 @@ export default function RankingPopup({
                 </TouchableOpacity>
               </View>
             )}
-          </ScrollView>
+          </View>
         </View>
       </View>
     </Modal>
@@ -364,7 +363,7 @@ const styles = StyleSheet.create({
   },
   popupContainer: { 
     width: width * 0.9, 
-    maxHeight: height * 0.8, 
+    maxHeight: height * 0.85, 
     backgroundColor: '#fff', 
     borderRadius: 24,
     shadowColor: '#000',
@@ -373,8 +372,7 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 15,
   },
-  scrollView: { 
-    flex: 1,
+  contentContainer: {
     paddingBottom: 20
   },
   spotHeader: { 
